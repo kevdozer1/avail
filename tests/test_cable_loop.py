@@ -24,6 +24,19 @@ def mujoco_ok():
     return True
 
 
+@pytest.fixture(scope="module")
+def latch_witnesses(mujoco_ok):
+    """The cable loop's witnesses for latch. They are built from the cable zoo's tables under AVAIL_DATA, so a fresh
+    clone without that data skips the tests that need them."""
+    from avail.core.task import load_task
+    from avail.station.mj_plug import cable_shift
+
+    try:
+        return cable_shift.make_witnesses(load_task("cable_loop"), "latch", 0.01)
+    except FileNotFoundError as exc:
+        pytest.skip(f"needs the cable zoo's tables under AVAIL_DATA: {exc}")
+
+
 def _claim(pred, item, port):
     from avail.schemas import Claim, ClaimContext, Predicate
 
@@ -126,7 +139,7 @@ def test_the_white_cable_in_dim_light_is_still_white(mujoco_ok):
         cell.close()
 
 
-def test_a_chosen_takeover_is_1_call_for_help_and_labels_the_state_it_found(mujoco_ok):
+def test_a_chosen_takeover_is_1_call_for_help_and_labels_the_state_it_found(latch_witnesses):
     """Dev seed 20007, latch, avail_human: cable 4's insertion is rejected twice, the person chooses to take over
     and seats it. That is 1 call for help with 1 wait. The takeover's label is what the person found, a plug that
     was not latched, so it agrees with the evidence it is stored with, and the done gate takes their sign-off."""
@@ -143,7 +156,7 @@ def test_a_chosen_takeover_is_1_call_for_help_and_labels_the_state_it_found(mujo
     task = load_task("cable_loop")
     cell = cable_shift.make_cell(20007, "latch")
     try:
-        driver = CycleDriver(task, cell, "avail_human", witnesses=cable_shift.make_witnesses(task, "latch", 0.01),
+        driver = CycleDriver(task, cell, "avail_human", witnesses=latch_witnesses,
                              human=cable_shift.make_human(cell, 20007), ledger=Ledger(),
                              evaluator=cable_shift.evaluator(cell))
         log = driver.run()
@@ -161,7 +174,7 @@ def test_a_chosen_takeover_is_1_call_for_help_and_labels_the_state_it_found(mujo
     assert assist.question == "takeover" and assist.truth_label is True               # the sign-off after the handback
 
 
-def test_the_person_fixes_a_blocked_latch(mujoco_ok):
+def test_the_person_fixes_a_blocked_latch(latch_witnesses):
     """Dev seed 20052, latch, avail_human: cable 3's latch is blocked, the insertion is rejected twice, and the person
     takes over. They take the plug out, clear the latch and seat it. On dev1, when the latch was cleared with the
     plug still in, the person could not pull it out and missed the port in 5 of 8 such takeovers."""
@@ -178,7 +191,7 @@ def test_the_person_fixes_a_blocked_latch(mujoco_ok):
     task = load_task("cable_loop")
     cell = cable_shift.make_cell(20052, "latch")
     try:
-        CycleDriver(task, cell, "avail_human", witnesses=cable_shift.make_witnesses(task, "latch", 0.01),
+        CycleDriver(task, cell, "avail_human", witnesses=latch_witnesses,
                     human=cable_shift.make_human(cell, 20052), ledger=Ledger(), evaluator=cable_shift.evaluator(cell)).run()
         truth = cable_shift.evaluate(cell)
     finally:

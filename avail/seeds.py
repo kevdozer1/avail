@@ -26,6 +26,7 @@ FINAL_RUNS = {
     "E7": "shift_test_e7",
     "E1bE2b": "zoo_test_hard",      # S4b: E1 and E2 on hard mode
     "E1cE2c": "zoo_test_hard2",     # S4c: E1 and E2 on hard mode v2
+    "FIG": "fig_test",              # S5c: the README figure, 100 cable-loop cycles per arm
 }
 
 

@@ -85,6 +85,7 @@ def test_seed_ranges_match_docs_07_and_are_disjoint():
         "zoo_test_hard2": (70000, 71999),
         "cable_fit": (24000, 25999),
         "cable_calibration": (26000, 27999),
+        "fig_test": (72000, 72099),
     }
     assert budget.split_of(0) == "dev" and budget.split_of(9999) == "dev"
     assert budget.split_of(16000) == "zoo_test"

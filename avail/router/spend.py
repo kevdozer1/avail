@@ -73,7 +73,7 @@ from .errors import RouterError, SessionNotApproved, SpendCapExceeded, UnknownSe
 TOTAL_CAP_KEY = "build_total"
 #: sessions counted outside the build total. A paid call in one needs Kevin's OK (``approved=True``)
 APPROVAL_SESSIONS = ("full_judge_run", "S4b_judges")   # S4b_judges: Kevin's OK of 2026-11-11, up to $30
-APPROVAL_PREFIXES = ("E3_vlm_arm_",)
+APPROVAL_PREFIXES = ("E3_vlm_arm_", "FIG_")   # FIG_: the figure run's judge arm, Kevin's $6 of 2026-11-13
 # E3_vlm_arm_<variant>: the E3 final run's judge, 1 session per variant, each counted on its own. Their caps are 0
 # until Kevin sets them, before he starts E3
 LOCK_TIMEOUT_S = 120.0

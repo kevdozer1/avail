@@ -2,7 +2,7 @@
 
 A robot step is done when evidence says so.
 
-<!-- FIGURE -->
+![1 unlatched plug and what each grader said about it, then 100 cycles of a 5-cable loop under 4 graders](docs/img/fig.png)
 
 In simulation, agentic robotics systems grade themselves with privileged truth: ASPIRE keeps the programs its
 benchmark scores as successes, RPG practices against simulator checkers, and EmbodiedSWE grades against hidden rubrics
@@ -44,7 +44,17 @@ Clopper-Pearson. [RESULTS.md](docs/RESULTS.md) has every table and [STATISTICS.m
 | Sim: AVAIL's cascade at alpha 2% accepts bad `latch` plugs, hard mode v2 | 1,111 | 0.5%, bound 1.06% |
 | Sim: the same cascade sends `latch` claims to a person | 1,886 | 2.6% (2.0 to 3.4) |
 
-<!-- E3 ROWS -->
+| Sim: the skills alone declare a bad cable done, 5-cable `latch` loop | 1,000 cycles | 67.3% of cycles (64.3 to 70.1) |
+| Sim: AVAIL with a simulated person declares a bad cable done, same loop | 5,000 cycles | 0.62% of cycles (0.44 to 0.88), bound 0.84% |
+| Sim: what the person's help cost on that run | 5,000 cycles | 118.7 calls per 100 cycles, 1.81 times the cycle time |
+
+The last 2 rows miss the bar set before the run, under 0.5% at 95%. Every bad cable that got through passed at the
+release step, through a hand-set rule. The calibrated insertion check let none through in 6,000 cycles.
+
+The figure is its own run: 100 cycles per grader on the same 100 new seeds, read once. The skill's own flag declared a
+bad cable done in 64. A cheap VLM judge looking after every step held back all 100, because it said no to almost
+everything. AVAIL alone declared none bad and finished 43, and AVAIL with a person finished 97 at 134 calls for help
+per 100 cycles. [RESULTS.md](docs/RESULTS.md) has its table.
 
 ## What this does not show
 

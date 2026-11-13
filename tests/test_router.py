@@ -2208,8 +2208,11 @@ def test_caps_come_from_spend_caps_usd_in_experiment_yaml():
     c = load_spend_caps()
     assert c.total_usd == 15.0  # build_total
     assert dict(c.sessions) == {"S1": 1.0, "S3": 8.0, "S4_without_ok": 5.0, "full_judge_run": 40.0, "S4b_judges": 30.0,
-                                "S5_vlm_arm": 10.0, "E3_vlm_arm_latch": 0.0, "E3_vlm_arm_fric": 0.0}
-    assert c.outside_total == frozenset({"full_judge_run", "S4b_judges", "E3_vlm_arm_latch", "E3_vlm_arm_fric"})
+                                "S5_vlm_arm": 10.0, "E3_vlm_arm_latch": 0.0, "E3_vlm_arm_fric": 0.0,
+                                "FIG_agent_looks": 6.0}       # Kevin's brief of 2026-11-13: $6, the figure's judge arm
+    assert c.outside_total == frozenset({"full_judge_run", "S4b_judges", "E3_vlm_arm_latch", "E3_vlm_arm_fric",
+                                         "FIG_agent_looks"})
+    assert c.needs_approval("FIG_agent_looks")
     assert c.needs_approval("full_judge_run") and not c.needs_approval("S5_vlm_arm")
     assert c.needs_approval("E3_vlm_arm_latch")        # each variant's E3 judge counted on its own: 0 until Kevin sets it
     assert c.needs_approval("S4b_judges")              # Kevin's OK of 2026-11-11 for the hard-mode judge run, up to $30

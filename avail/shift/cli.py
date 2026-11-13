@@ -6,6 +6,8 @@
     avail shift export --shift dev1                                   intervention episodes, LeRobot-style, and labels
     avail shift e3 --variant latch --plan                            the E3 final run: its arms, seeds and cost, no cycle
     avail shift e3 --variant latch --final-run E3                    the E3 final run itself. Kevin starts it
+    avail shift fig --plan                                           the README figure's run: arms, seeds, judge estimate
+    avail shift fig --final-run FIG                                  the figure run itself (seeds 72,000 to 72,099)
 
 Shift dev seeds are 20,000 to 23,999. The E3 test seeds (30,000 to 37,999) are read once, by
 ``avail shift e3 ... --final-run E3`` alone: ``run`` refuses ``--final-run E3``. Every run is resumable:
@@ -216,6 +218,106 @@ def other_caps_warning(plan: dict, started: bool = False, final: bool = False) -
             + ". Leave a variant's vlm arm out only if it will never run")
 
 
+FIG_RUN = "FIG"
+FIG_ARMS = {"skill_done": "flag", "agent_looks": "agent_looks", "avail": "avail", "avail_human": "avail_human"}
+def fig_judge_problem(task_name: str, model: str) -> str | None:
+    """Why the figure run's judge may not be called, or None: the testbed's ``fig_judge_problem`` hook. A testbed with
+    no hook has no figure judge."""
+    import importlib
+
+    from ..core.task import load_task
+
+    bed = importlib.import_module(load_task(task_name).testbed)
+    if not hasattr(bed, "fig_judge_problem"):
+        return f"the testbed {bed.__name__} has no figure judge"
+    return bed.fig_judge_problem(model)
+
+
+def fig_plan() -> dict:
+    """The figure run as config writes it: arms, cycles, the seeds they share, and the judge arm's estimate. An
+    estimate over the cap cuts the judge arm's cycles, never below ``fig.min_judge_cycles``."""
+    from ..config import load_experiment
+
+    exp = load_experiment()
+    fig, (lo, hi) = exp.fig, exp.seeds.fig_test
+    cycles = int(fig.get("cycles", 100))
+    if lo + cycles - 1 > hi:
+        raise ValueError(f"fig.cycles {cycles} is more than the fig_test range {lo} to {hi} holds")
+    session = f"{FIG_RUN}_agent_looks"
+    cap = float(exp.spend_caps_usd.get(session, 0.0))
+    per_cycle = int(fig["judge_calls_per_cycle_max"]) * float(fig["judge_usd_per_call"])
+    judge_cycles = cycles
+    if per_cycle * cycles > cap:
+        judge_cycles = int(math.floor(cap / per_cycle + 1e-9)) if per_cycle > 0 else cycles
+    arms = {}
+    for name in fig.get("arms", list(FIG_ARMS)):
+        n = judge_cycles if name == "agent_looks" else cycles
+        arms[name] = {"driver_arm": FIG_ARMS[name], "cycles": n, "seeds": [lo, lo + n - 1]}
+    return {"variant": fig["variant"], "split": "fig_test", "arms": arms,
+            "alpha": exp.customer_bar["alpha_for_bar"],
+            "judge": {**dict(fig.get("judge", {})), "session": session, "cap_usd": cap,
+                      "estimate_usd": round(per_cycle * cycles, 2), "estimate_usd_per_cycle": round(per_cycle, 4),
+                      "cycles": judge_cycles, "min_cycles": int(fig.get("min_judge_cycles", 40))}}
+
+
+def _fig(parser, args) -> int:
+    """``avail shift fig``: print the plan and the judge estimate, check everything a read needs, then run each arm on
+    the same seeds, the judge arm last."""
+    plan = fig_plan()
+    if args.arm:
+        unknown = [a for a in args.arm if a not in plan["arms"]]
+        if unknown:
+            parser.error(f"FIG has no arm {', '.join(unknown)}. Its arms: {', '.join(plan['arms'])}")
+        plan["arms"] = {a: s for a, s in plan["arms"].items() if a in args.arm}
+    judge = plan["judge"]
+    print(f"judge arm estimate: at most ${judge['estimate_usd']:.2f} for {load_fig_cycles()} cycles "
+          f"(${judge['estimate_usd_per_cycle']:.4f} per cycle, {judge['model']}), cap ${judge['cap_usd']:.2f} in session "
+          f"{judge['session']}", flush=True)
+    plan["setup_files"] = setup_hashes(args.task)
+    print(json.dumps({k: v for k, v in plan.items() if k != "setup_files"}, indent=1), flush=True)
+    problems = []
+    if "agent_looks" in plan["arms"]:
+        if judge["cycles"] < judge["min_cycles"]:
+            problems.append(f"the judge arm's estimate allows {judge['cycles']} cycles under the ${judge['cap_usd']:.2f} "
+                            f"cap, under the minimum of {judge['min_cycles']}")
+        elif judge["cycles"] < int(load_fig_cycles()):
+            print(f"\nthe estimate is over the cap, so agent_looks runs {judge['cycles']} cycles", flush=True)
+        problems.append(fig_judge_problem(args.task, judge["model"]))
+    problems += [station_problem(args.task), prepare_problem(args.task, [plan["variant"]], plan.get("alpha"))]
+    record = _shift_dir("fig_setup.json")
+    problems.append(setup_problem(record, plan["setup_files"]))
+    problems = [p for p in problems if p]
+    if args.plan:
+        for line in problems:
+            print(f"\nbefore the run: {line}", flush=True)
+        return 0
+    if args.final_run != FIG_RUN:
+        parser.error("the figure run reads its test seeds once. Pass --final-run FIG to start it")
+    if problems:
+        parser.error(problems[0])
+    if not record.is_file():
+        record.parent.mkdir(parents=True, exist_ok=True)
+        record.write_text(json.dumps({"task": args.task, "files": plan["setup_files"]}, indent=1),
+                          encoding="utf-8", newline="\n")
+    from .runner import run_shift
+
+    expected = json.loads(record.read_text(encoding="utf-8"))["files"]
+    for name, spec in sorted(plan["arms"].items(), key=lambda kv: kv[0] == "agent_looks"):   # the paid arm last
+        changed = setup_problem(record, setup_hashes(args.task))
+        if changed:
+            parser.error(changed)
+        lo, hi = spec["seeds"]
+        run_shift(args.task, plan["variant"], spec["driver_arm"], list(range(lo, hi + 1)), shift="fig_final",
+                  run_root=_shift_dir("fig_final"), workers=args.workers, final_run=FIG_RUN, expected_setup=expected)
+    return 0
+
+
+def load_fig_cycles() -> int:
+    from ..config import load_experiment
+
+    return int(load_experiment().fig.get("cycles", 100))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="avail shift", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = parser.add_subparsers(dest="command", required=True)
@@ -225,7 +327,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run = sub.add_parser("run", help="run cycles of 1 arm")
     p_run.add_argument("--task", default="cable_loop")
     p_run.add_argument("--variant", required=True)
-    p_run.add_argument("--arm", required=True, choices=["flag", "vlm", "avail", "avail_human"])
+    p_run.add_argument("--arm", required=True, choices=["flag", "vlm", "avail", "avail_human", "agent_looks"])
     p_run.add_argument("--seeds", type=_seeds, required=True, help="low:high, high excluded")
     p_run.add_argument("--shift", required=True, help="the shift's name: its folder under AVAIL_DATA/runs/shifts")
     p_run.add_argument("--workers", type=int, default=2)
@@ -246,7 +348,16 @@ def main(argv: list[str] | None = None) -> int:
     p_e3.add_argument("--final-run", default=None)
     p_e3.add_argument("--workers", type=int, default=4)
     p_e3.add_argument("--arm", action="append", default=None, help="run only these arms (repeat)")
+    p_fig = sub.add_parser("fig", help="the README figure's final run (FIG)")
+    p_fig.add_argument("--task", default="cable_loop")
+    p_fig.add_argument("--plan", action="store_true", help="print the plan and the judge estimate, and stop")
+    p_fig.add_argument("--final-run", default=None)
+    p_fig.add_argument("--workers", type=int, default=4)
+    p_fig.add_argument("--arm", action="append", default=None, help="run only these arms (repeat)")
     args = parser.parse_args(argv)
+
+    if args.command == "fig":
+        return _fig(parser, args)
 
     if args.command == "prepare":
         import importlib
@@ -265,9 +376,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{args.task} {variant}: " + ", ".join(f"{k} {v}" for k, v in made.items()), flush=True)
         return 0
     if args.command == "run":
-        if args.final_run == FINAL_RUN:
-            parser.error("the E3 split is read by `avail shift e3 --variant <variant> --final-run E3` alone, which checks "
-                         "the caps, the witnesses and the setup record before any seed is read")
+        if args.final_run in (FINAL_RUN, FIG_RUN):
+            parser.error(f"the {args.final_run} split is read by its own command alone (`avail shift e3` or `avail shift "
+                         "fig`), which checks the caps, the witnesses and the setup record before any seed is read")
         from .runner import run_shift
 
         summary = run_shift(args.task, args.variant, args.arm, args.seeds, shift=args.shift, run_root=_shift_dir(args.shift),

@@ -142,7 +142,7 @@ class View:
     key: str                      # the frame key, for example claim/right_camera_d405
     when: str                     # claim or relook
     role: str                     # one of the ROLE_ names
-    crop: str = "none"            # none (a whole frame), port (centered on the taught port) or center
+    crop: str = "none"            # none (a whole frame), port (centered on the taught port), gripper or center
 
 
 def _split_key(key: str) -> tuple[str, str]:
@@ -290,11 +290,16 @@ def crop_to_port(frame: CameraFrame, nominal: NominalGeometry, port: int) -> Cro
     at most the frame's shorter side. None when the frame has no calibration, or when the port
     is behind the camera or outside the frame: that view does not show the port.
     """
+    return crop_to_point(frame, nominal.port_position(port))
+
+
+def crop_to_point(frame: CameraFrame, point) -> Crop | None:
+    """The square around a point in the base frame, sized as ``crop_to_port`` sizes it. None as there."""
     rgb = _rgb(frame)
     calibration = _calibration(frame)
     if rgb is None or calibration is None:
         return None
-    hit = project_point(frame, nominal.port_position(port))
+    hit = project_point(frame, point)
     if hit is None:
         return None
     u, v, depth = hit
@@ -322,13 +327,16 @@ def center_crop(frame: CameraFrame) -> Crop | None:
     return Crop(rgb=pixels, on_port=False, x0=x0, y0=y0, side=side, scale=scale)
 
 
-def crop_view(frame: CameraFrame, nominal: NominalGeometry | None, port: int | None) -> Crop | None:
+def crop_view(frame: CameraFrame, nominal: NominalGeometry | None, port: int | None, point=None) -> Crop | None:
     """The crop of 1 view for the cropped variants.
 
     A calibrated frame is cropped around the taught port, and None means the frame does not
-    show the port. A frame that cannot be projected into (no calibration, no taught geometry
-    or no port in the claim) gives its central square.
+    show the port. ``point``: crop around this base-frame point instead, such as the gripper for
+    a step that does not happen at the port. A frame that cannot be projected into (no
+    calibration, no taught geometry or no port in the claim) gives its central square.
     """
+    if point is not None and _calibration(frame) is not None:
+        return crop_to_point(frame, point)
     if _calibration(frame) is None or nominal is None or port is None:
         return center_crop(frame)
     return crop_to_port(frame, nominal, port)
@@ -353,16 +361,19 @@ def _view_sentence(index: int, view: View) -> str:
     text = f"Image {index} shows the plug being judged, seen by {camera} {when}."
     if view.crop == "port":
         text += " It is cropped to a square around the target port, which is at or near the center of the image."
+    elif view.crop == "gripper":
+        text += " It is cropped to a square around the robot's gripper, which is at or near the center of the image."
     elif view.crop == "center":
         text += " It is cropped to the central square of the camera frame."
     return text
 
 
 def build_prompt(claim: Claim, connector: str | None, variant: str, views: list[View],
-                 n_ports: int | None = None) -> str:
+                 n_ports: int | None = None, state: list[str] | None = None) -> str:
     """The text of 1 judge call. ``views`` are the images of the plug being judged, in the order sent.
 
-    The text depends on the claim's predicate, the connector type, the variant and the views.
+    The text depends on the claim's predicate, the connector type, the variant and the views, and on
+    ``state`` when given: lines of the robot's own readings at the claim, as the caller words them.
     Nothing else about the state enters it.
     """
     if variant not in VARIANTS:
@@ -388,8 +399,11 @@ def build_prompt(claim: Claim, connector: str | None, variant: str, views: list[
         index = 2
     for offset, view in enumerate(views):
         lines.append(_view_sentence(index + offset, view))
-    if any(view.crop == "port" for view in views):
+    if any(view.crop in ("port", "gripper") for view in views):
         lines.append("A black area at the edge of an image lies outside the camera frame.")
+    if state:
+        lines += ["", "The robot's own readings at the moment it reported the step:"]
+        lines += [f"- {line}" for line in state]
     lines += [
         "",
         "Answer with 1 JSON object and no other text. It has 3 fields.",
@@ -451,6 +465,7 @@ def build_request(claim: Claim, params: dict) -> JudgeRequest:
         free = "left" if holding != "left" else "right"
     wanted = cfg.get("views")
     port = claimed_port(claim, nominal)
+    point = cfg.get("crop_point")                       # a step away from the port: crop around the gripper
     for view in select_views(frames, holding, free, list(wanted) if wanted is not None else None):
         frame = frames.get(view.key)
         pixels = _rgb(frame)
@@ -460,12 +475,12 @@ def build_request(claim: Claim, params: dict) -> JudgeRequest:
             request.images.append(pixels)
             request.views.append(view)
             continue
-        crop = crop_view(frame, nominal, port)
+        crop = crop_view(frame, nominal, port, point)
         if crop is None:
             request.left_out += 1
             continue
         request.images.append(crop.rgb)
-        request.views.append(replace(view, crop="port" if crop.on_port else "center"))
+        request.views.append(replace(view, crop=("gripper" if point is not None else "port") if crop.on_port else "center"))
     if not request.images:
         request.problem = ("no view shows the target port" if request.left_out else "no camera frame to send")
         return request
@@ -477,8 +492,10 @@ def build_request(claim: Claim, params: dict) -> JudgeRequest:
             return request
         request.images.insert(0, reference)
     connector = params.get("connector") or (nominal.connector if nominal is not None else None)
+    state = cfg.get("state")
     request.text = build_prompt(claim, connector, variant, request.views,
-                                n_ports=len(nominal.ports_board) if nominal is not None else None)
+                                n_ports=len(nominal.ports_board) if nominal is not None else None,
+                                state=[str(s) for s in state] if state else None)
     return request
 
 

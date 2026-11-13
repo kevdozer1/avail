@@ -29,7 +29,8 @@ ENV_FILE = REPO_ROOT / ".env"
 EXPERIMENT_YAML = REPO_ROOT / "config" / "experiment.yaml"
 MODELS_YAML = REPO_ROOT / "config" / "models.yaml"
 
-TEST_SPLITS = ("zoo_test", "shift_test_e3", "shift_test_e4", "shift_test_e7", "zoo_test_hard", "zoo_test_hard2")
+TEST_SPLITS = ("zoo_test", "shift_test_e3", "shift_test_e4", "shift_test_e7", "zoo_test_hard", "zoo_test_hard2",
+               "fig_test")
 PROFILES = ("easy", "hard", "hard2")
 HARD_PROFILES = ("hard", "hard2")          # profiles built on the hard-mode station: webcam, jams, force, lots
 
@@ -128,6 +129,7 @@ class SeedBudget(_Section):
     zoo_test_hard2: tuple[int, int]
     cable_fit: tuple[int, int] = (24000, 25999)          # S5b: the cable loop's insertions
     cable_calibration: tuple[int, int] = (26000, 27999)
+    fig_test: tuple[int, int] = (72000, 72099)            # S5c: the README figure's run, read once by FIG
 
     @model_validator(mode="after")
     def _disjoint(self) -> "SeedBudget":
@@ -424,6 +426,7 @@ class ExperimentConfig(_Section):
     economics: dict[str, Any]
     spend_caps_usd: dict[str, float]
     profiles: dict[str, HardProfile] = Field(default_factory=dict)
+    fig: dict[str, Any] = Field(default_factory=dict)        # S5c: the README figure's final run
 
     @field_validator("version", mode="before")
     @classmethod

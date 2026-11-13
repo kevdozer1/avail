@@ -61,4 +61,42 @@ A cycle picks 5 cables from a rack and plugs each into its assigned `latch` port
 own done, `avail` gates each step and never asks, `avail_human` gates each step and asks a simulated person when it
 cannot tell. The simulated person answers from truth and takes over with a scripted correction.
 
-<!-- E3 -->
+### E3: the certification run (sim, `latch`, test seeds read once)
+
+The bar, written before the run: certify under 0.5% of cycles with a bad cable declared done, at 95%. With 5,000
+cycles that allows at most 16.
+
+| Sim, E3 | `flag` | `avail` | `avail_human` |
+|---|---|---|---|
+| Cycles | 1,000 | 1,000 | 5,000 |
+| Cycles with a bad cable declared done | 67.3% (673, 64.3 to 70.1) | 0.6% (6, 0.3 to 1.3) | 0.62% (31, 0.44 to 0.88), bound 0.84% |
+| Cycles with every cable done | 29.2% (292) | 38.9% (389) | 97.9% (4,896) |
+| Calls for help per 100 cycles | 0 | 0 | 118.7 |
+| Seconds per cycle | 87 | 91 (1.05x) | 157 (1.81x) |
+
+`avail_human` missed the bar: 31 against at most 16. All 37 bad cables on the 2 AVAIL arms passed at the release
+step, through a hand-set rule with no calibrated bound. The calibrated insertion check let no bad insertion through in
+6,000 cycles. A calibrated check for the release is the next piece of work.
+
+### The figure run (sim, `latch`, 100 new test seeds read once)
+
+![The figure](img/fig.png)
+
+100 cycles per arm on seeds 72,000 to 72,099, the same seeds for every arm. `agent_looks` is an agent checking its own
+work by looking: after every step a VLM judge (GPT-6 Luna, the cropped view after a seated reference, the robot's
+readings in the prompt, reasoning off) sees the step's frames, and its yes or no decides, with 2 tries.
+
+| Sim, figure run | Skill says done | Agent looks at the camera | AVAIL | AVAIL + a person |
+|---|---|---|---|---|
+| Every cable truly done | 31 | 0 | 43 | 97 |
+| Declared done with a bad cable | 64 (54.2 to 72.7) | 0 | 0 (bound 3.0%) | 0 (bound 3.0%) |
+| Held back | 5 | 100 | 57 | 3 |
+| Time per cycle (x skill) | 1.00 | 0.84 | 1.03 | 1.85 |
+| Calls for help per 100 cycles | 0 | 0 | 0 | 134 |
+
+The judge was chosen by its S4c record: the non-Fable judge with the best balanced accuracy on hard-mode near misses,
+since none passed 80% of good plugs. It said yes to 123 of 883 picks, 1 of 246 carries and 0 of 2 insertions, so it
+held back every cycle, and its time is short because it stopped early. Its calls cost about $0.20. In the top panel it
+says not done about a bad plug, which is right, and it says the same about good ones. The 64 red cycles and the 0 on
+both AVAIL arms are the comparison that carries over. 100 cycles cannot show a rate under about 3%: E3 above is the
+large run.

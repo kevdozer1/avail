@@ -14,12 +14,13 @@ uv run python scripts/release_scan.py <this folder>
 | Check | What it looks for | Hits |
 |---|---|---|
 | Keys and tokens | 9 key shapes (OpenRouter, sk-, Anthropic, GitHub, Hugging Face, AWS, Google, private key blocks, Bearer values) and the exact value of the 1 key in the private `.env` | 0 |
-| Paths | any `D:` path and any user-home path (`C:\Users\...`, `/home/...`, `/Users/...`) | 0 |
+| Paths | any path on the data drive and any path into a Windows, Linux or macOS user's home folder | 0 |
 | Private notes | any run of 8 words shared with the private notes folder (23,618 runs) | 0 |
 | Private names | the 9 names on the private list, case-insensitive | 0 |
 | By hand | every line with `Jacob` that is not `Jacobian`, and every `Trevor` | 0 lines |
 
-209 text files were scanned. `.git`, `.venv`, `third_party` and `avail_data` were skipped. The scan found 3 hits on
+Rescanned at 07:00 after the figure run and the E3 results were added: 218 text files, 0 hits. The 1 line it lists
+for a hand check is the table row above, which names no person. At 02:55, 209 text files were scanned. `.git`, `.venv`, `third_party` and `avail_data` were skipped. The scan found 3 hits on
 its own run, all in `tests/test_paths_config.py`: a sample `D:` path in a parser test and the needles of the test that
 bans such paths. Both were rewritten so the file holds no drive path, in the working repo too.
 
@@ -41,4 +42,16 @@ design docs in 58 places and the session briefs in 9. They are pointers, and the
 `uv run pytest -m "not slow"` with no `third_party/ASPIRE` and no data: 2,948 passed, 106 skipped, 11 deselected in
 58 s. The skips are the tests that need the station model or the zoo.
 
-<!-- FRESH SETUP -->
+## From scratch (2026-11-13, 06:48 to 06:54)
+
+This folder copied to an empty temp folder without `.git`, `.venv`, `third_party`, data or `.env`, in a shell with
+`AVAIL_DATA`, the key and `PYTHONPATH` set to empty:
+
+| Step | Command | Result | Time |
+|---|---|---|---|
+| Setup | `uv run python scripts/setup_aspire.py` | exit 0: cloned ASPIRE at `fa00f0e`, checked the station files, wrote `.env` | 10.6 s |
+| Tests | `uv run pytest -q` | exit 0: 3,067 passed, 8 skipped (the zoo and cable data a clone lacks) | 4 min 15 s |
+| Demo | `uv run avail demo` | exit 0: 36 states per mode, 0 of 24 bad plugs accepted in each mode, report written | 81 s |
+
+A dry run of the same check at 03:12 found 2 cable-loop tests that failed without the cable zoo's tables. They now
+skip with the reason, in this folder and in the working repo.

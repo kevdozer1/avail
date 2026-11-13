@@ -22,6 +22,7 @@ seeds:
   zoo_test_hard2: [70000, 71999]        # S4c hard mode v2. Read once, by the final E1c and E2c run
   cable_fit: [24000, 25999]             # S5b: the cable loop's own insertions, to fit E3's insertion witness. Added 2026-11-12
   cable_calibration: [26000, 27999]     # S5b: and to calibrate it. Neither range is a test range
+  fig_test: [72000, 72099]              # S5c: the README figure's run. Read once, by the final run FIG. Added 2026-11-13
 
 customer_bar:                     # from the CoRL 2026 keynote slide "The customer sets the requirements"
   uptime: 0.985
@@ -183,6 +184,21 @@ spend_caps_usd:
   S5_vlm_arm: 10                  # Kevin's brief of 2026-11-12: $25 for the night in all. The step 2 judges spent $7.50, so the vlm arm's dev cycles get at most $10
   E3_vlm_arm_latch: 0             # E3 has no judge arm (Kevin, 2026-11-12), so these stay at 0 and nothing is charged to them
   E3_vlm_arm_fric: 0
+  FIG_agent_looks: 6              # Kevin's brief of 2026-11-13: $6 for the night, for the figure run's judge arm only
+
+# The README figure's final run (S5c, 2026-11-13). 100 cycles of the latch cable loop per arm on the same seeds.
+# skill_done trusts each step's own flag (the driver's flag arm). agent_looks: after every step a VLM judge sees the
+# step's camera frames and the robot's readings, and its yes or no decides. The judge is the non-Fable judge with the
+# best balanced accuracy in S4c, since none passed 80% of good plugs: on latch crop_ref, Luna (1 - 1.0% + 0 of 48) / 2
+# = 0.495 and Nex N2.5 mini (1 - 26.0% + 11 or 12 of 48) / 2 = 0.485 to 0.495. Reasoning is off for judge calls.
+fig:
+  variant: latch
+  cycles: 100
+  arms: [skill_done, agent_looks, avail, avail_human]
+  judge: {model: luna, prompt: crop_ref, robot_state: true}
+  min_judge_cycles: 40            # an estimate over the cap cuts agent_looks' cycles, never below this
+  judge_calls_per_cycle_max: 40   # 5 cables, 4 steps, at most 2 tries each
+  judge_usd_per_call: 0.00025     # Luna crop_ref in S4c: $0.0461 for 200 calls, $0.00023 each, plus the readings' text
 
 # --------------------------------------------------------------------------------------------------
 # Hard mode (S4b). Written on 2026-11-11 before any hard-mode state was simulated. Easy mode is

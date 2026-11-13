@@ -7,6 +7,7 @@ name, so the core imports no simulator. The testbed module provides:
 - ``make_witnesses(task, variant, alpha) -> {predicate: witness}``
 - ``make_human(cell, seed) -> human`` (``avail.fork.human.Human``)
 - ``make_judge() -> evidence source`` (the vlm arm's judge), may raise when no key is set
+- ``make_fig_judge(session) -> evidence source`` (the agent_looks arm's judge), only for that arm
 - ``evaluate(cell) -> {item: bool}``: the evaluator's truth on each item at the end of the cycle
 - ``frames_table(cell) -> DataFrame`` and ``scene_events(cell) -> list``: the cycle's frame log
 - ``close(cell)``
@@ -106,6 +107,8 @@ def run_block(args: tuple) -> dict:
     judge = None
     if arm == "vlm":                    # a final run's judge calls go to that run's own session, 1 per variant
         judge = bed.make_judge(session=f"{final_run}_vlm_arm_{variant}") if final_run else bed.make_judge()
+    elif arm == "agent_looks":          # the figure run's judge, charged to its own session
+        judge = bed.make_fig_judge(session=f"{final_run or 'FIG'}_agent_looks")
     with LedgerWriter(run_id, folder=run_dir) as ledger:
         for seed in todo:
             same_setup(expected, task_name, run_id, f"before seed {seed}")

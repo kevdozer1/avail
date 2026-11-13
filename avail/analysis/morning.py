@@ -503,6 +503,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--headline", required=True)
     parser.add_argument("--card", default=None, help="a JSON list of [label, value] pairs. Default: from the ledgers")
     parser.add_argument("--no-video", action="store_true")
+    parser.add_argument("--figure", default=None, help="a PNG for the top of the page, such as the README figure")
+    parser.add_argument("--figure-title", default="The README figure, sim")
     args = parser.parse_args(argv)
     if args.cycle is not None and args.seed is None:
         parser.error("--cycle needs --seed: the filmstrip replays the cycle's scene from its seed")
@@ -519,6 +521,9 @@ def main(argv: list[str] | None = None) -> int:
         cycle, seed = chosen["cycle_id"], int(chosen["seed"])
         print("cycle:", json.dumps(chosen), flush=True)
     panels = []
+    if args.figure:
+        shutil.copy2(args.figure, out / "readme_fig.png")
+        panels.append((args.figure_title, "readme_fig.png", None))
     if args.before and args.after:
         change = fig_dev_change(out, args.before, args.after, args.connector)
         if change:

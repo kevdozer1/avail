@@ -227,15 +227,37 @@ def make_human(cell: CableCell, seed: int):
     return OracleHuman(cell, seed)
 
 
-class _Judge:
-    """The vlm arm's judge: the evidence source ``judge.vlm`` with the model and prompt settings filled in."""
+AWAY_FROM_PORT = ("pick",)                        # steps a judge's crop centers on the gripper instead of the port
 
-    def __init__(self, model: str, variant: str, session: str):
+
+def robot_readings(view, params: dict) -> list[str]:
+    """The robot's own readings at a claim, in words a judge can use: the gripper reading and where the tool is
+    against its taught pose with the plug seated in the target port. Robot state and taught geometry only."""
+    import numpy as np
+
+    arm = params.get("arm", "right")
+    state = view.robot_state().arms[arm]
+    nominal = params["nominal"]
+    lines = [f"Gripper reading {float(state.gripper_pos):.2f}, on a scale from 0 (closed) to 1 (open). "
+             f"Closed on a plug it reads about {nominal.expected_jaw_pos():.2f}."]
+    port = params.get("port")
+    if port:
+        off = (np.asarray(state.tool_pose.pos, dtype=float) - np.asarray(nominal.seated_tool_pose(int(port)).pos)) * 1000
+        lines.append(f"The tool is {float(off[2]):.1f} mm above, and {float(np.hypot(off[0], off[1])):.1f} mm to the side "
+                     f"of, where it would be with the plug seated in the target port.")
+    return lines
+
+
+class _Judge:
+    """The vlm arm's judge: the evidence source ``judge.vlm`` with the model and prompt settings filled in.
+    ``with_state``: the prompt also carries the robot's readings at the claim (``robot_readings``)."""
+
+    def __init__(self, model: str, variant: str, session: str, with_state: bool = False):
         from ...evidence import base
         from ...router import Router
 
         self.source = base.get("judge.vlm")
-        self.model, self.variant = model, variant
+        self.model, self.variant, self.with_state = model, variant, bool(with_state)
         self.router = Router(session=session, approved=True, phase="shift_vlm")
         self._refs: dict = {}
 
@@ -255,6 +277,10 @@ class _Judge:
         call = dict(params)
         call["judge"] = {"model": self.model, "variant": self.variant, "router": self.router,
                          "reference": self._refs.get(connector)}
+        if self.with_state:
+            call["judge"]["state"] = robot_readings(view, params)
+        if params.get("step") in AWAY_FROM_PORT:      # the cable is in the tray, not at its port: crop around the jaws
+            call["judge"]["crop_point"] = view.robot_state().arms[params.get("arm", "right")].tool_pose.pos
         return self.source.collect(view, claim, call)
 
 
@@ -273,11 +299,41 @@ def judge_problem() -> str | None:
     return f"the E3 judge {model} cannot be called now: {reason}" if reason else None
 
 
-def make_judge(model: str | None = None, variant: str | None = None, session: str = "S5_vlm_arm"):
+def make_judge(model: str | None = None, variant: str | None = None, session: str = "S5_vlm_arm",
+               with_state: bool = False):
     """The vlm arm's judge. Its model and prompt come from config (``e3.vlm_judge``), which the seed guard
     hashes, so an E3 run cannot change its judge between arms."""
     judge = dict(load_experiment().e3.get("vlm_judge", {}))
-    return _Judge(model or judge.get("model", "fable"), variant or judge.get("prompt", "crop_ref"), session)
+    return _Judge(model or judge.get("model", "fable"), variant or judge.get("prompt", "crop_ref"), session, with_state)
+
+
+FIG_PRICE_IN_MAX = 3.0                            # Kevin, 2026-11-13: no model above $3 per million input tokens
+
+
+def fig_judge_problem(model: str) -> str | None:
+    """Why the figure run's judge may not be called, or None: a Fable model, a price above the night's limit, or a call
+    the router would refuse now (no key, an entry not verified)."""
+    from ...router.models import default_models
+    from ...router.smoke import skip_reason
+
+    models = default_models()
+    entry = models.models.get(model)
+    if entry is None:
+        return f"config/models.yaml has no model {model}, which fig.judge names"
+    if "fable" in f"{model} {entry.id} {entry.display}".lower():
+        return f"fig.judge names {model}, a Fable model, and tonight's brief rules Fable out"
+    priced = models.models.get(getattr(entry, "model_key", None) or model, entry)
+    price = getattr(priced, "price_in", None)
+    if price is None or float(price) > FIG_PRICE_IN_MAX:
+        return f"{model} costs {price} per million input tokens, above the ${FIG_PRICE_IN_MAX:.0f} limit"
+    reason = skip_reason(entry)
+    return f"the figure judge {model} cannot be called now: {reason}" if reason else None
+
+
+def make_fig_judge(session: str = "FIG_agent_looks"):
+    """The FIG run's agent_looks judge: config ``fig.judge`` (model, prompt, robot_state), on every step."""
+    judge = dict(load_experiment().fig.get("judge", {}))
+    return _Judge(judge["model"], judge.get("prompt", "crop_ref"), session, with_state=bool(judge.get("robot_state")))
 
 
 def evaluator(cell: CableCell):

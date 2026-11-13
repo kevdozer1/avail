@@ -16,7 +16,9 @@ a small duck-typed interface, so it never imports a simulator or anything plug-s
 Arms (docs/07, E3): ``flag`` trusts each step's own flag. ``vlm`` trusts the flags, except that a
 judge decides the steps the task file marks ``judge: true`` (the cable loop's insertion). ``avail`` verifies every claim with the task's witnesses and follows
 the fork policy with no person: an abstain or a last reject leaves the item unresolved.
-``avail_human`` is the same with a person behind the fork.
+``avail_human`` is the same with a person behind the fork. ``agent_looks`` (S5c, the figure run) is an agent that
+checks its own work by looking: after every step a judge sees the step's frames (and, when the testbed gives them,
+the robot's readings), and its yes or no decides, with the flag arm's tries.
 
 The done gate (``avail.fork.gate``) is the only thing that declares an AVAIL arm's item done: every
 required predicate has an accept verdict or a person's sign-off. The flag and vlm arms do not use
@@ -30,7 +32,8 @@ from dataclasses import dataclass, field
 
 from ..schemas import Claim, ClaimContext, Predicate, new_id
 
-ARMS = ("flag", "vlm", "avail", "avail_human")
+ARMS = ("flag", "vlm", "avail", "avail_human", "agent_looks")
+JUDGED_ARMS = ("vlm", "agent_looks")
 
 
 @dataclass
@@ -157,12 +160,13 @@ class CycleDriver:
                     attempt += 1
                     continue
                 return False
-            if self.arm == "vlm":
+            if self.arm in JUDGED_ARMS:
                 holds = self._judge(item, step, claim, res)
                 if holds:
                     self._decided_by = "judge"
                     return True
-                if attempt < 2:                         # docs/07: the judge decides, with up to 2 retries
+                # docs/07: the vlm arm's judge decides with up to 2 retries. agent_looks has the flag arm's tries
+                if attempt + 1 < (3 if self.arm == "vlm" else self.max_attempts):
                     attempt += 1
                     continue
                 return False
@@ -210,7 +214,7 @@ class CycleDriver:
         return verdict
 
     def _judge(self, item: int, step, claim: Claim, res) -> bool:
-        """The vlm arm: a judge's answer on a judged step. Its text never becomes a verdict: it only stops a retry loop."""
+        """A judged arm: a judge's answer on a judged step. Its text never becomes a verdict: it only stops a retry loop."""
         params = self.cell.claim_params(item, step.name, res)
         ev = self.judge.collect(self.cell.view, claim, params)
         self._emit("evidence", ev)
