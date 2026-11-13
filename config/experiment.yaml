@@ -1,0 +1,266 @@
+# AVAIL experiment config.
+#
+# Every value marked ASSUMPTION is a starting guess written on 2026-11-11 before any code ran.
+# Tune on dev seeds only, record what changed in the session report, and never tune on test seeds.
+
+version: "2026-11-11"
+
+seeds:
+  dev: [0, 9999]
+  zoo_fit: [10000, 13999]
+  zoo_calibration: [14000, 15999]
+  zoo_test: [16000, 17999]        # read once, by the final E1 and E2 run
+  shift_dev: [20000, 23999]
+  shift_test_e3: [30000, 37999]   # read once, by the final E3 run. Arms share seeds
+  shift_test_e4: [40000, 44999]   # read once, by the final E4 run. Both arms share seeds
+  shift_test_e7: [50000, 59999]   # stretch. Read once, by the final E7 run
+  zoo_fit_hard: [60000, 61999]          # S4b hard mode, added 2026-11-11
+  zoo_calibration_hard: [62000, 63999]  # S4b hard mode
+  zoo_test_hard: [64000, 65999]         # S4b hard mode. Read once, by the final E1b and E2b run
+  zoo_fit_hard2: [66000, 67999]         # S4c hard mode v2, added 2026-11-12
+  zoo_calibration_hard2: [68000, 69999] # S4c hard mode v2
+  zoo_test_hard2: [70000, 71999]        # S4c hard mode v2. Read once, by the final E1c and E2c run
+  cable_fit: [24000, 25999]             # S5b: the cable loop's own insertions, to fit E3's insertion witness. Added 2026-11-12
+  cable_calibration: [26000, 27999]     # S5b: and to calibrate it. Neither range is a test range
+
+customer_bar:                     # from the CoRL 2026 keynote slide "The customer sets the requirements"
+  uptime: 0.985
+  defect_rate: 0.005              # uncaught failures per cycle must be certified under this
+  safety_incidents: 0
+  slow_the_line: false            # reported as cycle time against the no-verification baseline
+  horizon: full_shift
+  certify_confidence: 0.95
+  alpha_for_bar: 0.01             # cascade budget used when certifying the bar. ASSUMPTION
+
+bounds:
+  alpha: 0.02                     # false-accept budget for the cascade
+  beta: 0.05                      # false-reject budget for the cascade
+  alpha_sweep: [0.005, 0.01, 0.02, 0.05]
+  certificate_confidence: 0.95
+  true_accept_for_e1: 0.95        # E1 compares sources at matched true-accept
+
+predicates:
+  seated: {depth_tol_mm: 0.5, lateral_tol_mm: 0.5, tilt_tol_deg: 2.0}
+  latched: {requires: seated}
+  at_port: {}
+  released_stable: {settle_s: 1.0}
+
+station:
+  render: {width: 640, height: 480}
+  cameras: [top_camera_d405, left_camera_d405, right_camera_d405]
+  board: {rows: 2, cols: 4, pitch_mm: 40, mode: flat}       # pitch is ASSUMPTION, adjust if fingers collide
+  randomization:
+    board_xy_mm: 15
+    board_yaw_deg: 5
+    camera_xyz_mm: 3
+    camera_rot_deg: 1
+    lights: [2, 4]
+    distractor_cables: [0, 3]
+  noise:                                                    # all ASSUMPTION
+    force_estimate_sigma_n: 0.8
+    force_estimate_bias_drift_n_per_min: 0.2
+    port_localization_sigma_mm: 1.0
+    stiction_under_travel_mm: {prob: 0.1, max: 4.0}
+    gripper_position_resolution_mm: 0.05                    # finger travel the gripper encoder resolves. Added in S3
+    gripper_position_sigma_mm: 0.02
+    gripper_force_sigma_n: 0.3
+    joint_velocity_sigma_rad_s: 0.002
+
+connectors:                                                 # all forces ASSUMPTION, replace with S7 measurements
+  # Added in S2 for every connector (see docs/02_plug_station.md, "Retention model"):
+  #   geometry_mm       the plug and socket shapes. x is the direction the fingers squeeze.
+  #   axial_friction_n  [depth_mm, N]: sliding friction along the port axis while the plug is in the socket.
+  #   detent_n          [shortfall_mm, N]: the conservative force F(d), written against the distance still to go.
+  #                     Positive pulls the plug toward the seat. Negative pushes it out.
+  #                     Insertion peak = friction + the most negative value. Seated retention = friction + the most positive.
+  fric:
+    full_depth_mm: 12
+    insertion_peak_n: 4
+    retention_seated_n: 8
+    retention_2mm_short_n: [1, 3]
+    geometry_mm: {tongue_xy: [4.5, 12.0], body_xyz: [12.0, 18.0, 32.0], clearance: 0.25, chamfer: 1.2}
+    axial_friction_n: [[0.0, 0.0], [2.0, 0.0], [4.0, 1.5], [12.0, 1.5]]
+    detent_n: [[0.0, 0.0], [0.12, 6.5], [0.30, 6.5], [0.45, 0.0], [0.75, -2.5], [1.6, 0.0]]
+  latch:
+    full_depth_mm: 12
+    insertion_peak_n: 6
+    retention_seated_n: 25
+    retention_latch_blocked_n: 1
+    retention_2mm_short_n: [0, 1]
+    geometry_mm: {tongue_xy: [8.0, 11.6], body_xyz: [14.0, 17.0, 32.0], clearance: 0.25, chamfer: 1.2}
+    axial_friction_n: [[0.0, 0.0], [2.0, 0.0], [4.0, 0.6], [12.0, 0.6]]
+    detent_n: [[0.0, 0.0], [0.25, 24.4], [0.35, 24.4], [0.45, 0.0], [0.75, -5.4], [1.6, 0.0]]
+    detent_latch_blocked_n: [[0.0, 0.4], [1.6, 0.4], [2.0, 0.0]]          # a weak spring only. With friction: 1 N
+  prong:
+    full_depth_mm: 16
+    seated_min_depth_mm: 14
+    insertion_peak_n: 5
+    retention_seated_n: 12
+    retention_2mm_short_n: [0, 1]
+
+zoo:
+  per_connector: 2000
+  positive_share: 0.4
+  near_miss_share_of_negatives: 0.5        # N1, N2, N3, N5
+  judge_subsample_per_connector: 400
+  classes: [P0, N1, N2, N3, N4, N5, N6, N7, N8, N9]
+
+probes:                                                     # caps are fixed at run time (CLAUDE.md rule 15)
+  push_seat: {force_cap_x_insertion_peak: 1.5, travel_cap_mm: 6, speed_mm_s: 5}
+  tug: {force_cap_x_retention: 0.6, travel_cap_mm: 3, speed_mm_s: 3, slip_mm: 0.5}
+  wiggle: {force_cap_n: 2, travel_cap_mm: 1, cycles: 2}
+  relook: {standoff_mm: 80}
+
+cascade:
+  default_order: [passive, push_seat, tug, vision_gap, judge]
+
+fork:
+  max_attempts: 2
+  stall_limit_s: 60
+  human_timeout_s: 300
+
+human:                                                      # OracleHuman, all ASSUMPTION
+  answer_delay_median_s: 20
+  answer_delay_sigma_log: 0.6
+  fix_handle_s: 45
+  human_error: 0.02
+
+audit:
+  accept_rate: 0.05
+  reject_rate: 0.05
+  first_n_all: 50
+  full_evidence_share: 0.5
+
+flywheel:
+  refit_every_labels: 25
+  loosen_min_new_negatives: 50
+  rule_min_occurrences: 3
+
+drift:
+  window: 50
+  cusum: {k_fraction_of_shift: 0.5, h: 4.0}                 # ASSUMPTION
+  conservative_margin: 0.1
+
+standin_s1:
+  target_first_attempt_success: [0.80, 0.90]
+  failure_mix: {under_push: 0.5, lateral_offset: 0.2, wrong_port: 0.1, early_release: 0.1, unlatched: 0.1}   # ASSUMPTION
+
+e3:
+  cycles_per_arm: 1000
+  avail_human_cycles: {latch: 5000, default: 1000}   # 5,000 certify the 0.5% bar with up to 16 uncaught failures
+  vlm_arm_cycles: 300
+  arms: [flag, avail, avail_human]   # Kevin, 2026-11-12: no judge arm in E3, no spend. H3's ratio against vlm is not measured in closed loop (docs/07, S5b note)
+  variants: [latch, fric]     # E3 runs per connector type. The config freezes at E3's 1st read
+  vlm_judge: {model: fable, prompt: crop_ref}   # the vlm arm's judge: Fable 5.2 on the crop with a seated reference, chosen before the S4c judge numbers. A change here needs a new vlm_usd_per_cycle
+  vlm_usd_per_cycle: 0.21     # measured 2026-11-12: the 40 vlm cycles of the dev shift dev1 cost $8.16 at full price ($7.95 paid, 8 of 303 calls came from the cache), $0.204 per cycle. The E3 run refuses to start a vlm arm its cap cannot cover
+
+e4:
+  shifts: 20
+  cycles_per_shift: 200
+  initial_calibration_states: 400
+  injection_after_shift: 10
+  injection: {camera_xyz_mm: 8, camera_rot_deg: 4, fric_retention_scale: 0.7}
+
+e7:                                                         # stretch, after v0.1. See docs/07_experiments.md
+  initial_demos: [50, 200, 1000]
+  on_the_job_hours: 24
+  update_every_cycles: 200
+  gates: [none, avail, oracle]
+
+economics:                                                  # ASSUMPTION, for the calculator only
+  utilization: 0.7
+  human_rate_usd_per_hour: 30
+  robot_rate_usd_per_hour: 10
+  defect_cost_usd: 50
+
+spend_caps_usd:
+  build_total: 15
+  S1: 1
+  S3: 8
+  S4_without_ok: 5
+  full_judge_run: 40
+  S4b_judges: 30                  # Kevin's OK on 2026-11-11 for the hard-mode judge run. Counted outside the build total
+  S5_vlm_arm: 10                  # Kevin's brief of 2026-11-12: $25 for the night in all. The step 2 judges spent $7.50, so the vlm arm's dev cycles get at most $10
+  E3_vlm_arm_latch: 0             # E3 has no judge arm (Kevin, 2026-11-12), so these stay at 0 and nothing is charged to them
+  E3_vlm_arm_fric: 0
+
+# --------------------------------------------------------------------------------------------------
+# Hard mode (S4b). Written on 2026-11-11 before any hard-mode state was simulated. Easy mode is
+# everything above this line and does not change. A station built with profile "hard" uses this
+# block on top of it. Each value carries its source or its rationale. ASSUMPTION marks a value that
+# is reasoned and not measured. None of these values may be tuned to reach an abstain rate.
+# "Kevin's frames" are the 5 wrist frames and their camera files in his SO-101 session checks of
+# 2026-08-18 and 2026-08-19, read on 2026-11-11 for measurements only.
+profiles:
+  hard:
+    wrist_camera:                       # both wrist cameras. The overhead camera stays as in easy mode
+      sensor_px: [1920, 1080]           # Kevin's brief: the stock SO-101 wrist camera is a 1080p USB 2.0 UVC webcam
+      diagonal_fov_deg: 130             # Kevin's brief: a 130 degree wide-angle lens. Taken as the diagonal, as webcam sheets give it
+      projection: equidistant           # Kevin's brief: fisheye-style lens with strong barrel distortion. Image radius = f x angle
+      unit_focal_pct: 2.0               # ASSUMPTION: focal length spread between lens units, plus or minus, uniform. Each seed draws a unit
+      unit_center_px: 15                # ASSUMPTION: optical center spread between units at 1080p, plus or minus, uniform
+      unit_k_sd: [0.02, 0.005]          # ASSUMPTION: unit spread of the fisheye terms k1 and k2 around the equidistant lens, 1 sd
+      calib_focal_pct_sd: 0.3           # ASSUMPTION: residual of a checkerboard calibration with the OpenCV fisheye model, 1 sd
+      calib_center_px_sd: 2.0           # ASSUMPTION: the same, for the optical center at 1080p
+      calib_k_sd: [0.004, 0.001]        # ASSUMPTION: the same, for k1 and k2. The pipeline rectifies with these estimates
+      pixel_pitch_um: 2.8               # ASSUMPTION: a 1/2.7 inch 1080p sensor, 5.4 mm wide
+      f_number: 2.0                     # ASSUMPTION: a typical M12 wide-angle webcam lens
+      focus_distance_m: 0.5             # ASSUMPTION: fixed focus, as Kevin's camera files show (no focus control). His frames fit a focus well beyond the jaws: edges near the jaws blur to a median sd of 1.4 px at 640x480 (upper quartile 1.7 to 1.9), edges in the upper frame to 0.5 to 0.8 px. Not a fit of this value
+      lens_psf_px: 0.7                  # ASSUMPTION: the lens's own blur at best focus, Gaussian sd in 1080p pixels
+      full_well_e: 9000                 # ASSUMPTION: typical of a 2.8 um pixel
+      read_noise_e: 3.0                 # ASSUMPTION: typical of a 2.8 um pixel
+      white_e_per_s: 300000             # ASSUMPTION, unsourced light level: a rendered white surface is white paper under 400 lux, at f/2, QE 0.6, 1 of 3 Bayer colors
+      max_exposure_s: 0.0333            # Kevin's brief: 30 fps, so no exposure is longer than 1 frame
+      max_gain: 16                      # ASSUMPTION: the analog and digital gain ceiling of a webcam sensor
+      ae_target: 0.18                   # mid gray, the usual auto exposure target, metered over the central half of the frame
+      ae_jitter_ev: 0.15                # ASSUMPTION: frame-to-frame wander of the auto exposure loop, 1 sd in stops
+      awb_error_sd: 0.05                # ASSUMPTION: per-episode error of an automatic white balance on red and on blue, 1 sd. Kevin's frames were taken with the balance locked, so they bound nothing here (blue at 0.61 of green in warm light at 4000 K)
+      awb_jitter_sd: 0.02               # ASSUMPTION: frame-to-frame wander of the white balance gains, 1 sd
+      readout_s: 0.028                  # ASSUMPTION: rolling shutter, the time to read 1080 rows at 30 fps
+      jpeg_quality: 90                  # measured on Kevin's 640x480 MJPEG frames: no quantization step shows, so libjpeg quality 88 or more. At 90 a 1080p frame here is about 0.1 to 0.2 MB, under 6 MB/s at 30 fps, far below USB 2.0's 24.6 MB/s. Changed from an unsourced 75 after review, before any hard fit state existed
+      chroma_subsampling: "4:2:2"       # measured on Kevin's frames: color is halved across and kept at full height. Applied at 1080p, so it mostly averages out in the 3x downscale
+      working_px: [640, 360]            # the rectified 1080p frame downscaled 3 times, the size every evidence source reads
+    plug_cable:                         # visual only, never collides. Replaces the 28 mm stub of easy mode
+      diameter_mm: 4.5                  # ASSUMPTION: a round USB cable
+      side_gap_mm: [1.0, 8.0]           # ASSUMPTION: how far from the plug body's side the hanging cable passes, uniform
+      end_above_shoulder_mm: 2.0        # ASSUMPTION: the cable comes down to just above the plug's shoulder, then runs off along the board
+      sector_deg: 100                   # the fingers hold the plug's x faces, so the cable leaves toward +y or -y within +-50 degrees, uniform. No routing preference
+    jams:                               # a hard stop short of home that no push under the cap can pass
+      classes: [N1, N2, N3, N4]         # Kevin's brief: the short plugs. The sticking joint of easy mode makes the rest of them
+      share: 0.5                        # ASSUMPTION: share of those states made by a jam. Kevin's brief: mix them from config
+      kinds: {burr: 0.5, wedge: 0.5}    # Kevin's brief: a burr or a misalignment. ASSUMPTION: an even split
+      wedge_hold_x_retention: [0.2, 1.0]   # ASSUMPTION: the pull a wedged plug holds, as a share of its connector's seated retention, uniform. A burr holds no pull
+      wedge_seat_mm: 0.10               # a jammed plug whose tip is this close to its stop is at the stop: the arm holds there, as it holds a stuck-joint plug, and a wedge binds. A numerical band, not a physical value
+      wedge_ramp_mm: 0.10               # ASSUMPTION: its hold builds over this much pull-out, about the give of a molded plug in its bore
+      wedge_span_mm: 0.40               # ASSUMPTION: and lets go after this much, once the plug has come free of the bind. It catches again when pushed back onto the stop
+    force:
+      bias_drift_n_per_min: 1.0         # ASSUMPTION: thermal drift of a force estimate built from motor currents. Easy mode: 0.2
+      bias_walk_n_per_sqrt_s: 0.1       # ASSUMPTION: random walk of the same bias
+      hysteresis_n: 0.7                 # ASSUMPTION: gearbox friction of about 0.25 Nm per joint over a 0.35 m lever. The estimate reads high by this while the load rises and low while it falls
+      tare_with_noise: true             # a tare averages the noisy estimate for 0.1 s, so it keeps that average as an offset. Easy mode tares exactly
+      detent_lot_pct: 30                # Kevin's brief: detent force varies per connector lot by plus or minus 30%
+      lots: 20                          # ASSUMPTION: lots per connector type. Each lot's factor is uniform in 1 +- 0.30. Each seed draws a lot
+
+# --------------------------------------------------------------------------------------------------
+# Hard mode v2 (S4c). Written on 2026-11-12 before any v2 state was simulated. Kevin's choice from the
+# S4b list: the servo's encoder resolution and gear lash, and its current noise and current counts.
+# Everything else is profiles.hard, unchanged. The servo is the SO-101's, a 12 V Feetech STS3215
+# serial bus servo, the robot of S7. Its magnetic encoder reads the output shaft, so a joint reading
+# is the joint's own angle on the encoder's count grid, and the gear lash shows as lost motion: when
+# a joint's torque turns, the servo passes no torque until its motor side has crossed the lash.
+# The guarded move's own speed loop and travel stop still run on the joint angles, as the servo's
+# internal loop would. What the robot reports, and every check reads, is at the servo's resolution.
+# None of these values may be tuned to reach an abstain rate.
+  hard2:
+    base: hard
+    joint_readings:
+      counts_per_turn: 4096             # the STS3215's 12-bit magnetic encoder on the output shaft, 360/4096 degrees per count (Feetech STS3215 datasheet, Waveshare ST3215 sheet)
+      zero_phase_counts: [0.0, 1.0]     # each joint's count grid sits at a phase of its true zero drawn uniform within 1 count per joint and seed. A grid lined up with the true zero would be a coincidence
+    gear_lash:
+      lash_deg: [0.5, 1.0]              # gear lash per joint, uniform per joint and seed: from the spec's at most 0.5 degrees (DFRobot STS3215 sheet) to the about 1 degree of free play measured by hand on an STS3215 (SO-ARM100 issue 134)
+      motor_speed_rad_s: 4.72           # the motor side crosses the lash at the servo's no-load speed, 0.222 s per 60 degrees at 12 V (Waveshare ST3215 sheet). The fastest it can, so the lost motion here is the least the lash allows
+      breakaway_nm: 0.1                 # the motor side moves only when the servo's torque passes the joint's friction, the model's 0.1 Nm friction loss per joint (station.JOINT_FRICTION). That torque includes the arm's weight, which a real servo carries and ASPIRE's model holds up from outside the motors
+    current_readings:
+      count_ma: 6.5                     # the STS3215 reports its current in counts of 6.5 mA (Feetech STS memory table, Present_Current)
+      stall_current_a: 2.7              # the 12 V ST3215 draws 2.7 A at its stall torque (Waveshare ST3215 sheet). So 1 count is 6.5 / 2,700 of a joint's peak torque, taken as the YAM model's actuator limit of 28 Nm (joints 1 to 3) or 10 Nm (joints 4 to 6)
+      noise_counts_sd: 2.0              # ASSUMPTION: a current shunt sampled against the motor's PWM ripple wanders by about 2 counts per read. White, 1 draw per 4 ms control tick

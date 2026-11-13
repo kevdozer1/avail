@@ -1,0 +1,36 @@
+# The plug task of S2 to S4: one plug, already in the gripper, inserted into its target port and released.
+# The zoo, E1 and E2 ran on it. Its predicate texts are the ones the schemas used through S4, word for word.
+task: plug_insert
+title: Insert the plug in the gripper into its target port, then let go of it
+items: {kind: plug, count: 1}
+steps:
+  - {name: insert, claim: seated, claim_by_variant: {latch: latched}}
+  - {name: release, claim: released_stable}
+predicates:
+  seated:
+    done_means: The plug is in the named port, its shoulder is flush with the socket face within the depth tolerance, and it sits straight.
+    checks: [passive.skill_flag, passive.pose_residual, passive.jaw_state, passive.click, vision.gap@claim, probe.push_seat, probe.tug, vision.gap@now]
+    decide: {kind: witness, witness: "{variant}"}
+  latched:
+    done_means: The plug is seated in the named port and its latch is engaged, so it does not come out under a light pull.
+    checks: [passive.skill_flag, passive.pose_residual, passive.jaw_state, passive.click, vision.gap@claim, probe.push_seat, probe.tug, vision.gap@now]
+    decide: {kind: witness, witness: "{variant}"}
+  at_port:
+    done_means: The plug is in or at the mouth of the named port and no other port.
+    checks: [passive.pose_residual, vision.gap@claim]
+    decide: {kind: witness, witness: "{variant}"}
+  held:
+    done_means: The gripper is holding the named plug.
+    checks: [passive.jaw_state]
+    decide: {kind: witness, witness: "{variant}"}
+  released_stable:
+    done_means: The gripper has let go of the named plug and the plug has stayed where it was.
+    checks: [passive.jaw_state]
+    decide: {kind: witness, witness: "{variant}"}
+  removed:
+    done_means: The named plug is out of the named port.
+    checks: []
+    decide: {kind: witness, witness: "{variant}"}
+fork:
+  max_attempts: 2
+  ask: {abstain: confirm, reject_last: choose}

@@ -1,0 +1,76 @@
+# GR00T 2's cable loop, as Kevin set it on 2026-11-12: pick a cable from the tray, carry it, insert it
+# into its assigned port, release it, then the next cable. 5 cables into 5 assigned ports per cycle,
+# then the cell is reset. A cycle is every step of every cable in tray order.
+#
+# The checks named here are evidence sources, 1 file each. The 3 the plug task lacked were added
+# for this task: passive.jaw_hold, passive.hover_pose and vision.cable_tag (avail/evidence/).
+# The thresholds of the rule witnesses come from the cell's taught geometry and were set on
+# 2026-11-12 on dev renders and 3 dev cycles, before any dev shift ran. On those renders the wrist
+# camera could not tell a cable cocked in the jaws from a straight one, so held asks only which
+# cable is held, and straightness is part of at_port, where a cocked cable puts the tool off its
+# taught hover pose. Over the board the camera read the white cable as no cable, so at_port uses
+# the color only to reject a wrong one. With a cable seated in a neighboring port the camera often
+# cannot see the socket's near wall, so released_stable is decided on the jaws, and the camera can
+# only reject. seated and latched use the zoo's calibrated cascade without its camera stage
+# (avail/station/mj_plug/cable_shift.py says why).
+# Changed after the dev shift dev1 (2026-11-12), before any shift test seed was read: released_stable
+# also reads passive.release_record. On dev1 a stuck release lifted the plug out of its port and the
+# retry opened the jaws above it. The rule, which read only the jaws, accepted 11 such releases in 100
+# cycles of the avail arm, 11 of the 12 bad releases it accepted.
+task: cable_loop
+title: Pick each cable from the tray, carry it to its assigned port, insert it and let go of it
+testbed: avail.station.mj_plug.cable_shift
+items: {kind: cable, count: 5}
+steps:
+  - {name: pick, claim: held}
+  - {name: carry, claim: at_port}
+  - {name: insert, claim: seated, claim_by_variant: {latch: latched}, judge: true}   # the vlm arm's judge decides this step
+  - {name: release, claim: released_stable}
+predicates:
+  held:
+    done_means: The gripper holds the named cable, and no other cable, in its jaws.
+    checks: [passive.jaw_hold, vision.cable_tag]
+    decide:
+      kind: rule
+      accept_all:
+        - {feature: passive.jaw_hold/in_band, above: 0.5}       # the jaws stopped on a body of the plug's width
+        - {feature: vision.cable_tag/match, above: 0.5}         # the color in the jaws is the named cable's
+      reject_any:
+        - {feature: passive.jaw_hold/closed_empty, above: 0.5}  # the jaws closed on nothing
+        - {feature: vision.cable_tag/mismatch, above: 0.5}      # another cable's color is in the jaws
+  at_port:
+    done_means: The named cable hangs straight in the jaws, its tip over the mouth of its assigned port and no other port, ready to go in.
+    checks: [passive.hover_pose, passive.jaw_hold, vision.cable_tag]
+    decide:
+      kind: rule
+      accept_all:
+        - {feature: passive.hover_pose/port_match, above: 0.5}  # the nearest taught port is the assigned one
+        - {feature: passive.hover_pose/in_band, above: 0.5}     # within 3 mm of its taught pre-insert pose. A cable cocked in the jaws puts the tool off it
+        - {feature: passive.jaw_hold/in_band, above: 0.5}
+      reject_any:
+        - {feature: passive.hover_pose/port_match, below: 0.5}
+        - {feature: passive.hover_pose/lateral_mm, above: 6.0}  # 6 mm off is a cocked cable or a wrong port, whatever else holds
+        - {feature: passive.jaw_hold/closed_empty, above: 0.5}
+        - {feature: vision.cable_tag/mismatch, above: 0.5}
+  seated:
+    done_means: The cable's plug is in its assigned port, its shoulder is flush with the socket face within the depth tolerance, and it sits straight.
+    checks: [passive.skill_flag, passive.pose_residual, passive.jaw_state, passive.click, vision.gap@claim, probe.push_seat, probe.tug, vision.gap@now]
+    decide: {kind: witness, witness: "{variant}"}
+  latched:
+    done_means: The cable's plug is seated in its assigned port and its latch is engaged, so it does not come out under a light pull.
+    checks: [passive.skill_flag, passive.pose_residual, passive.jaw_state, passive.click, vision.gap@claim, probe.push_seat, probe.tug, vision.gap@now]
+    decide: {kind: witness, witness: "{variant}"}
+  released_stable:
+    done_means: The gripper has let go of the cable and its plug has stayed seated in its assigned port.
+    checks: [passive.jaw_hold, passive.release_record, vision.gap@now]
+    decide:
+      kind: rule
+      accept_all:
+        - {feature: passive.jaw_hold/open, above: 0.5}           # the jaws are open. The insert step already verified the seat
+      reject_any:
+        - {feature: passive.jaw_hold/open, below: 0.5}           # the fingers did not open
+        - {feature: passive.release_record/lifted_closed, above: 0.5}  # a try lifted with the jaws shut and took the plug up with it
+        - {feature: vision.gap@now/gap_mm_est, above: 2.0}       # the camera, when it reads the port, sees the plug come up
+fork:
+  max_attempts: 2
+  ask: {abstain: confirm, reject_last: choose, at_port_reject: guide_marks}

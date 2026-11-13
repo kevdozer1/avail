@@ -1,0 +1,17 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+third_party/
+context/
+*.mp4
+*.png
+*.jpg
+!docs/**/*.png
+!docs/**/*.jpg
+!reports/morning_img/*.png
+reports/*_run.json
+reports/drafts/
+archive/
+avail_data/

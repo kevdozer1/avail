@@ -1,0 +1,11 @@
+AVAIL
+Licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This project uses the dual-YAM station model (MJCF and meshes) from ASPIRE by NVIDIA:
+  https://github.com/NVlabs/ASPIRE
+  pinned commit fa00f0ef2bc1d91d594b9aa502c22133c9f538f7
+  Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. Licensed under the Apache License, Version 2.0.
+
+The model is read from a clone at setup time (scripts/setup_aspire.py puts it in third_party/ASPIRE).
+No ASPIRE file is copied into or distributed with this repository.
+avail/agent/mock_aspire.py builds its tool list by importing ASPIRE's own tool definitions from that clone.

@@ -1,0 +1,299 @@
+# AVAIL model table. Prices in USD per million tokens.
+#
+# What was done on 2026-11-11 (session S1):
+# 1. The `models:` block was filled from loopkit's config/models.yaml (version 2026-10-17, ids and
+#    prices read from the OpenRouter catalogue on 2026-10-18). Each entry got its AVAIL role from the
+#    `carry_over_from_loopkit` block: judge, decider or test.
+# 2. Every OpenRouter id was looked up again in the live catalogue with 1 keyless request
+#    (GET https://openrouter.ai/api/v1/models, answered 2026-11-11T13:15Z, 466 models listed).
+#    opus, astra, sol, argon, cheap_open, luna and glimpse's alt_route id are all listed, and no input
+#    or output price changed. The 6 carried-over entries whose own id is an OpenRouter id now carry
+#    accessed 2026-11-11. cheap_open gained its cache read price (0.0025), which loopkit's entry lacked.
+# 3. The same read lists Claude Fable 5.2, so `fable` was added to `models:` and `to_verify.fable`
+#    was filled in.
+# 4. Not re-read: glimpse's direct id (its model list needs a key), d1 and jev (neither is in the
+#    OpenRouter catalogue). They keep loopkit's source and date.
+# 5. The catalogue also says which models always reason and which take no temperature. Those facts
+#    are recorded per entry (reasoning_mandatory, reasoning_efforts, supports_temperature), because
+#    the router needs them to ask for a small JSON answer in a form the model accepts.
+# 6. No API key was set, so no paid call has been made with any entry. `avail models` runs the live
+#    smoke once a key is in .env.
+#
+# verified: true means the id and the prices were read from a live catalogue or the provider's own
+# pages, and `source` and `accessed` say where and when.
+# verified: false means no paid call may use the entry yet. The router refuses it.
+#
+# Image input tokens are priced at price_in unless a provider lists a separate image price.
+# The typed loader is avail/router/models.py. It rejects unknown fields.
+
+version: "2026-11-11"
+currency: USD
+unit: usd_per_million_tokens
+
+roles:
+  judge: models asked whether a predicate holds, from images
+  decider: small typed-decision models run in shadow at forks
+  agent: the coding agent attached to the tool server in S5
+  test: the offline FakeModel, for tests and dry runs
+
+# Which loopkit entries were carried over on 2026-11-11, and in which role.
+carry_over_from_loopkit:
+  judge: [opus, astra, sol, argon, glimpse, cheap_open, luna]
+  decider: [jev, d1]
+  test: [fake]
+
+# New entries to look up. Do not guess ids or prices.
+# fable was read from the catalogue on 2026-11-11 and now has its entry under `models:`.
+# open_27b and flora_rewarder are still open.
+to_verify:
+  fable:
+    display: Claude Fable 5.2
+    why: released 2026-11-09, reported strong on robot control benchmarks
+    adapter: openrouter
+    id: anthropic/claude-fable-5.2      # read from the catalogue on 2026-11-11
+    roles: [judge]
+    verified: true
+    model_key: fable                    # the entry under `models:` that holds its prices
+    source: OpenRouter catalogue (GET /api/v1/models) read 2026-11-11T13:15Z
+    accessed: "2026-11-11"
+  open_27b:
+    display: an open-weights vision model near 27B, such as the Qwen family ZAP and Flora build on
+    why: an open judge a deployment team could host
+    adapter: openrouter
+    id: null
+    roles: [judge]
+    verified: false
+  flora_rewarder:
+    display: Flora-Rewarder (nvidia/Flora-Rewarder on Hugging Face)
+    why: optional judge in S8. 27B, H100-class GPU, NVIDIA License, non-commercial research and evaluation only
+    adapter: local
+    id: nvidia/Flora-Rewarder
+    roles: [judge]
+    verified: false
+
+# Minimum set for the E1 judge run, if keys allow:
+# 1 frontier model from each of 3 providers, 1 cheap closed model, 1 open-weights model.
+e1_minimum: [opus, astra, argon, luna, cheap_open]
+
+models:
+  opus:
+    display: Claude Opus 5.5
+    adapter: openrouter
+    id: anthropic/claude-opus-5.5
+    direct: {adapter: anthropic, id: claude-opus-5-5}   # loopkit's note of a direct route. Not re-read, not used by AVAIL's router
+    price_in: 4.00
+    price_out: 20.00
+    cached_in: 0.20
+    vision: true
+    roles: [judge]
+    reasoning_mandatory: true
+    reasoning_efforts: [max, xhigh, high, medium, low]
+    supports_temperature: false
+    verified: true
+    source: OpenRouter catalogue (GET /api/v1/models) read 2026-11-11T13:15Z, unchanged from loopkit's 2026-10-18T00:41Z read
+    accessed: "2026-11-11"
+    notes: >-
+      2026-11-11 catalogue read. Prices 4.00 / 20.00 and cache read 0.20 are unchanged. Reasoning is mandatory
+      (efforts max to low) and temperature is not a supported parameter
+
+  fable:
+    display: Claude Fable 5.2
+    adapter: openrouter
+    id: anthropic/claude-fable-5.2
+    price_in: 8.00
+    price_out: 40.00
+    cached_in: 0.20
+    vision: true
+    roles: [judge]
+    reasoning_mandatory: true
+    reasoning_efforts: [max, xhigh, high, medium, low]
+    supports_temperature: false
+    verified: true
+    source: OpenRouter catalogue (GET /api/v1/models) read 2026-11-11T13:15Z. Input text, image and file
+    accessed: "2026-11-11"
+    notes: >-
+      New in AVAIL on 2026-11-11. It is not in loopkit's table. The catalogue snapshot is
+      anthropic/claude-fable-5.2-20261109. Reasoning is mandatory (efforts max to low) and temperature is not
+      a supported parameter
+
+  astra:
+    display: GPT-6 Astra
+    adapter: openrouter
+    id: openai/gpt-6-astra
+    price_in: 10.00
+    price_out: 50.00
+    cached_in: 1.00
+    vision: true
+    roles: [judge]
+    reasoning_mandatory: true
+    reasoning_efforts: [max, xhigh, high, medium, low]
+    supports_temperature: false
+    verified: true
+    source: OpenRouter catalogue (GET /api/v1/models) read 2026-11-11T13:15Z, unchanged from loopkit's 2026-10-18T00:41Z read
+    accessed: "2026-11-11"
+    notes: >-
+      2026-11-11 catalogue read. Prices 10.00 / 50.00 and cache read 1.00 are unchanged. Above 272,000 prompt
+      tokens the catalogue lists 20.00 / 75.00. Reasoning is mandatory (efforts max to low) and temperature is
+      not a supported parameter
+
+  sol:
+    display: GPT-6.1 Sol
+    adapter: openrouter
+    id: openai/gpt-6.1-sol
+    fallback_id: openai/gpt-6-sol   # also listed at 2.00 / 10.00 on 2026-11-11
+    price_in: 2.00
+    price_out: 10.00
+    cached_in: 0.10
+    vision: true
+    roles: [judge]
+    reasoning_mandatory: true
+    reasoning_efforts: [max, xhigh, high, medium, low]
+    supports_temperature: false
+    verified: true
+    source: >-
+      OpenRouter catalogue (GET /api/v1/models) read 2026-11-11T13:15Z, unchanged from loopkit's
+      2026-10-18T00:41Z read. Input text, image and file
+    accessed: "2026-11-11"
+    notes: >-
+      2026-11-11 catalogue read. Prices 2.00 / 10.00 and cache read 0.10 are unchanged. Above 272,000 prompt
+      tokens the catalogue lists 4.00 / 15.00. Reasoning is mandatory (efforts max to low) and temperature is
+      not a supported parameter
+
+  argon:
+    display: Gemini 4 Argon
+    adapter: openrouter
+    id: google/gemini-4-argon
+    direct: {adapter: gemini, id: null}   # loopkit's note of a direct route. Not re-read, not used by AVAIL's router
+    price_in: 2.00
+    price_out: 10.00
+    cached_in: 0.10
+    vision: true
+    roles: [judge]
+    reasoning_mandatory: true
+    reasoning_efforts: [high, medium, low]
+    supports_temperature: true
+    verified: true
+    source: >-
+      OpenRouter catalogue (GET /api/v1/models) read 2026-11-11T13:15Z, unchanged from loopkit's
+      2026-10-18T00:41Z read. The catalogue also lists an image price of 0.000002 USD per image
+    accessed: "2026-11-11"
+    notes: >-
+      2026-11-11 catalogue read. Prices 2.00 / 10.00 and cache read 0.10 are unchanged. Reasoning is mandatory
+      (efforts high, medium, low). Temperature is a supported parameter
+
+  glimpse:
+    display: Elorian Glimpse
+    adapter: elorian
+    id: elorian-1           # the plain model (snapshot elorian-1-2026-09-15). elorian-1-agent adds hosted Python and web search, not used here
+    base_url: https://api.elorian.ai/v1
+    alt_route: {adapter: openrouter, id: elorian/glimpse}   # used when ELORIAN_API_KEY is empty and OPENROUTER_API_KEY is set
+    env_key: ELORIAN_API_KEY
+    price_in: 0.60
+    price_out: 3.00
+    cached_in: 0.06
+    vision: true
+    roles: [judge]
+    verified: true
+    source: >-
+      Id, base URL and request format from the docs embedded in platform.elorian.ai's public client, read 2026-10-17:
+      OpenAI-compatible POST /v1/chat/completions, Bearer key (elor_sk_...), default_model elorian-1,
+      reasoning_effort one of low, medium, xhigh (xhigh is the default), max_completion_tokens (8000 recommended),
+      no cost field in usage. Price from the launch post (https://elorian.ai/blog/introducing-glimpse) and the
+      OpenRouter catalogue entry elorian/glimpse (0.60 / 3.00, cache read 0.06) read 2026-10-18T00:41Z.
+      The live /v1/models list needs a key and was not read
+    accessed: "2026-10-17"
+    notes: >-
+      2026-11-11 catalogue read. The alt_route id elorian/glimpse is listed at 0.60 / 3.00, cache read 0.06,
+      unchanged. The direct id elorian-1 was not re-read, because its model list needs a key, so this entry
+      keeps loopkit's source and date
+
+  cheap_open:
+    display: Nex N2.5 mini (cheap open-weights vision model)
+    adapter: openrouter
+    id: nex-agi/nex-n2.5-mini
+    price_in: 0.025
+    price_out: 0.10
+    cached_in: 0.0025
+    vision: true
+    roles: [judge]
+    reasoning_efforts: [high, medium, none]
+    supports_temperature: true
+    verified: true
+    source: >-
+      OpenRouter catalogue (GET /api/v1/models) read 2026-11-11T13:15Z. The id is listed with a Hugging Face id
+      (nex-agi/Nex-N2.5-mini), image input, structured_outputs and a 262,144 token context. Prices are unchanged
+      from loopkit's 2026-10-18T00:41Z read, where it was chosen as the cheapest paid model with open weights,
+      image input and JSON output (free and batch variants excluded)
+    accessed: "2026-11-11"
+    notes: >-
+      2026-11-11 catalogue read. Prices 0.025 / 0.10 are unchanged. The cache read price 0.0025 was added (loopkit's
+      entry had none). The catalogue lists structured_outputs for it and does not list response_format. It no
+      longer has the lowest input price among open-weights vision models. deepseek/deepseek-v4.1-flash-1017 lists
+      0.006 / 0.50. The choice was left as it is for the session that runs the judges
+
+  luna:
+    display: GPT-6 Luna (optional cheap closed baseline)
+    adapter: openrouter
+    id: openai/gpt-6-luna
+    price_in: 0.10
+    price_out: 0.50
+    cached_in: 0.01
+    vision: true
+    roles: [judge]
+    reasoning_efforts: [max, xhigh, high, medium, low, none]
+    supports_temperature: false
+    verified: true
+    source: OpenRouter catalogue (GET /api/v1/models) read 2026-11-11T13:15Z, unchanged from loopkit's 2026-10-18T00:41Z read
+    accessed: "2026-11-11"
+    notes: >-
+      2026-11-11 catalogue read. Prices 0.10 / 0.50 and cache read 0.01 are unchanged. Above 272,000 prompt
+      tokens the catalogue lists 0.20 / 0.75. Reasoning can be turned off. Temperature is not a supported parameter
+
+  d1:
+    display: Liquid d1
+    adapter: jev            # the System One decisions protocol, the same request shape as Jev
+    id: d1
+    endpoint: https://api.liquid.ai/decisions/v1/systemone
+    env_key: LIQUID_API_KEY
+    price_in: 0.04
+    price_out: 0.0
+    vision: true
+    roles: [decider]
+    verified: true
+    source: >-
+      Liquid AI blog (https://www.liquid.ai/blog/d1-decision-model) read 2026-10-17: model d1 at
+      https://api.liquid.ai/decisions/v1/systemone (body: model, optional images as base64 data URLs, state, questions),
+      billed on input tokens only at 0.04 per million, images at 1.5 tokens per 32x32 patch, each question billed as its
+      own prompt. OpenRouter lists liquid/d1 and liquid/d1-ultra on its Liquid provider page (text only there) but not in
+      the chat-completions catalogue
+    accessed: "2026-10-17"
+    notes: >-
+      Not re-read on 2026-11-11. liquid/d1 is not in the OpenRouter catalogue read that day, as loopkit's source
+      already says
+
+  jev:
+    display: Typesafe Jev
+    adapter: jev
+    id: jev-latest
+    endpoint: https://api.typesafe.ai/v1/systemone
+    env_key: TYPESAFE_JEV_API_KEY
+    price_in: 0.042
+    price_out: 0.0
+    vision: false
+    roles: [decider]
+    verified: true
+    source: robolabel prices.yaml (docs.typesafe.ai). The API returns no cost field, so compute from input tokens
+    accessed: "2026-09-26"
+    notes: Not re-read on 2026-11-11. It is not an OpenRouter model
+
+  fake:
+    display: FakeModel for tests and dry runs
+    adapter: fake
+    id: fake
+    price_in: 0.0
+    price_out: 0.0
+    vision: true
+    roles: [test]
+    verified: true
+    source: offline
+    accessed: null
