@@ -9,8 +9,9 @@ Uncertain or failed steps go to recovery actions and then to an operator. Every 
 Everything in this repository is simulation, and the operator is simulated too: it answers from simulator truth and
 takes over with a scripted correction. In the figure a simulated dual-arm YAM picks 5 cables per cycle and plugs each
 into its assigned `latch` port. A cycle ships a bad cable when it ends declared done while a cable is not seated,
-latched and let go in its assigned port. Each point is 1 run on test seeds read once, with 95% intervals. The dashed line is the
-bar set before the runs: under 0.5% of cycles at 95% confidence, which allows at most 16 bad cycles in 5,000.
+latched and let go in its assigned port. Each point is 1 run on test seeds read once, with 95% intervals. The dashed
+line is the bar set before the runs: under 0.5% of cycles at 95% confidence, which allows at most 16 bad cycles in
+5,000.
 
 | Sim, `latch`, test seeds read once | Cycles | Cycles with a bad cable shipped | Calls for help per 100 cycles | Time per cycle |
 |---|---|---|---|---|
@@ -18,13 +19,13 @@ bar set before the runs: under 0.5% of cycles at 95% confidence, which allows at
 | E3: AVAIL with the simulated operator | 5,000 | 31 (0.62%, 0.44 to 0.88), bound 0.84% | 118.7 | 157 s |
 | E3b: the same after its checks were fixed | 5,000 | 2 (0.04%, 0.01 to 0.15), bound 0.13% | 223.6 | 219 s |
 
-Rates carry a Wilson 95% interval, and bounds are one-sided 95% Clopper-Pearson. E3 missed the bar. Every bad cable it
-shipped passed at the release step, through a hand-set rule with no calibrated bound. Before E3b the 3 hand-set checks became
-calibrated witnesses, and the release check learned to close the jaws on the released plug and pull it lightly, which a
-latched plug holds. E3b met the bar on new seeds, at 223.6 calls for help per 100 cycles and 2.53 times the skills'
-cycle time. The 2 runs are not 2 tests of 1 system, and E3's failure stays on record. Both ran before the recovery
-ladder in this code existed. In them the only recovery was 1 retry of a rejected step, and an uncertain step went
-straight to the operator. [RESULTS.md](docs/RESULTS.md) has every table.
+Rates carry a Wilson 95% interval, and bounds are one-sided 95% Clopper-Pearson. E3 missed the bar. Every bad cable
+it shipped passed at the release step, through a hand-set rule with no calibrated bound. Before E3b the 3 hand-set
+checks became calibrated witnesses, and the release check learned to close the jaws on the released plug and pull it
+lightly, which a latched plug holds. E3b met the bar on new seeds, at 223.6 calls for help per 100 cycles and 2.53
+times the skills' cycle time. The 2 runs are not 2 tests of 1 system, and E3's failure stays on record. Both ran
+before the recovery ladder in this code existed. In them the only recovery was 1 retry of a rejected step, and an
+uncertain step went straight to the operator. [RESULTS.md](docs/RESULTS.md) has every table.
 
 ## Run the demo: 1 command
 
@@ -40,14 +41,17 @@ On a fresh clone that command does the setup too. uv installs the locked depende
 its pinned commit into `third_party/ASPIRE` for the dual-YAM station model (`scripts/setup_aspire.py`). Then it
 simulates 36 plug states for the `latch` connector in easy mode and 36 in hard mode, runs every free check and the
 calibrated cascade that ships in `avail/witness/shipped` on each, prints a small table per mode and opens an HTML
-report, `avail_data/runs/demo/report.html`. [RELEASE_CHECK.md](RELEASE_CHECK.md) has the commands and times of a
-check on a fresh clone.
+report, `avail_data/runs/demo/report.html`. On a fresh clone on 2026-11-16 the command took 8 min 16 s in all, on 1
+worker: 1 min 14 s for uv to install 55 packages, about 10 s to clone ASPIRE, and 6 min 43 s for the demo itself.
+The default is 4 workers. [RELEASE_CHECK.md](RELEASE_CHECK.md) has the commands and times.
 
 The demo shows the insertion check, the step that decides whether 1 plug is in, on a station where the truth is known.
 It does not run the cable loop of the figure. That loop's witnesses are fit and calibrated on tables from about 5,000
 simulated cycles, which do not ship and take hours to make. [Add a task](docs/ADD_A_TASK.md) lists the commands.
 
-`uv run pytest -q` runs the test suite. Tests that need the zoo's or the cable loop's tables skip and say so.
+`uv run pytest -q` runs the test suite, 3,093 tests in about 5 minutes. `-m "not slow"` leaves out 11 slow
+tests, 3 of which start up to 8 simulation processes at once. Tests that need the zoo's or the cable loop's tables
+skip and say so.
 
 ## Why
 
@@ -92,12 +96,12 @@ per 100 cycles.
 - No real hardware yet. Every number is simulation. A real camera, connector and force estimate will be noisier.
 - The operator is simulated. It answers from simulator truth, so it is never wrong, and it takes over with a scripted
   correction.
-- E3b met the bar at a high cost: 223.6 calls for help per 100 cycles, or 2.2 robots per operator. A run that asks
+- E3b met the bar at a high cost: 223.6 calls for help per 100 cycles and 2.2 robots per operator. A run that asks
   for the same bar at half the calls, E4, is written down in `config/experiment.yaml` and has not run.
 - The code here is 2 days newer than E3b. It adds the recovery ladder (a 2nd look, a regrip or a reinsert before a
   call), per-check alphas from an error budget and a rule for crossed thresholds, all chosen on dev and calibration
-  seeds. None of them has a test-seed result. A 1st gate on dev seeds failed with 2 bad cycles in 154, both after a
-  recovery action that was then dropped.
+  seeds. None of them has a test-seed result. A 1st gate on 500 dev cycles, which allows at most 1 bad cycle, failed
+  with 2 in its 1st 154, both after a recovery action that was then dropped.
 - ASPIRE's real server was not run. The proxy was tested against a mock built from ASPIRE's own tool definitions.
 - The closed-loop judge is a cheap model. A stronger judge may pass fewer bad plugs and was not run in closed loop.
 - The bounds hold for states like these: this station and this mix of failures.

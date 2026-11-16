@@ -12,8 +12,11 @@ states before it may accept at all: 49 at `alpha = 0.02`. A check cannot be cali
 
 ## A cascade
 
-Stages run in order of cost, each with its own accept and reject threshold. By the union bound the cascade's
-false-accept rate is at most the sum of the stages' alphas. A push or tug can repair a bad plug, which shrinks the
+Stages run in order of cost, each with its own accept and reject threshold. When a stage's reject threshold lies
+above its accept threshold, E3 and E3b abstained between the 2. Since 2026-11-16 the cable loop's check witnesses
+accept above the accept threshold and reject below it (`crossing: accept` in `config/experiment.yaml`). A false
+accept needs a score above the accept threshold under either rule, so the bound is the same. By the union bound the
+cascade's false-accept rate is at most the sum of the stages' alphas. A push or tug can repair a bad plug, which shrinks the
 pool of bad states between stages, so the budget is shared in proportion to how many states are still bad at each
 stage, with the shares taken from the fit split (`avail/witness/calibrate.py`).
 

@@ -90,7 +90,8 @@ reads the board's offset as the robot measured it (`passive.hover_offset`). `rel
 release record, the lift's forces and the camera, then ends with a pull (`probe.release_tug`): the jaws close on the
 released plug again and pull it below the latch's hold, which a latched plug holds. On calibration (in sample, alpha
 0.01) `held`, `at_port` and `released_stable` sent 5.0%, 5.3% and 3.6% of good claims to the operator. Without the
-pull the release check had sent 94.5%. The bar stayed the same: at most 16 of 5,000 cycles.
+pull the release check had sent 94.5%. The bar stayed the same: at most 16 of 5,000 cycles. E3b read seeds 80,000 to
+84,999 once, on 2026-11-14, with `skill_done` on the 1st 1,000 of them.
 
 | Sim, E3b, 2026-11-14 | `skill_done` | `avail_simop` |
 |---|---|---|

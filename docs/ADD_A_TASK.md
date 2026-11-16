@@ -44,7 +44,7 @@ fork:
   ask: {abstain: confirm, reject_last: choose, at_port_reject: guide_marks}
 ```
 
-This is the task file as E3 ran it. After E3 (2026-11-13) `held`, `at_port` and `released_stable` were decided by
+This is part of the task file as E3 ran it. After E3 (2026-11-13) `held`, `at_port` and `released_stable` were decided by
 calibrated witnesses too (`decide: {kind: witness, witness: "{variant}"}`), and on 2026-11-16 `fork` gained a `ladder`
 of recovery actions. `tasks/cable_loop.yaml` is the file as it stands now. The rule form above still works for a new
 task.
