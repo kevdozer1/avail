@@ -65,7 +65,7 @@ check covers every row, which is why AVAIL fuses them and adds probes ([RESULTS.
 
 ## What the numbers are, and are not
 
-- Simulation: the plug station's renders and physics, not a real camera or a real connector.
+- Simulation: the plug station's renders and physics. No real camera or real connector was measured.
 - The zoo's mix of failures, set in `config/experiment.yaml`. Another mix gives another overall rate. The per-type
   rows are the ones that carry over.
 - A check tuned on these same states will look better here than it is. Tune on `fit`, audit on `calibration`.

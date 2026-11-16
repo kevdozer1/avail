@@ -1,6 +1,8 @@
 """``avail demo``: the same small zoo in easy mode and in hard mode, the free checks, and a report with pictures.
 
-No key, no GPU. It injects 36 states for 1 connector on dev seeds kept for the demo, once in
+No key, no GPU, and 1 command on a fresh clone: the 1st run clones ASPIRE's station model at the
+pinned commit into ``third_party/ASPIRE`` (``scripts/setup_aspire.py``), and later runs only check it.
+It injects 36 states for 1 connector on dev seeds kept for the demo, once in
 easy mode and once in hard mode (S4b: a 1080p fisheye webcam on the wrist, jams that no push
 passes, a drifting force estimate, connector lots), runs every free evidence source on each,
 applies the thresholds of the witnesses that ship with the repo, prints a small evidence table
@@ -380,6 +382,25 @@ and are in docs/RESULTS.md.</p>
     return path
 
 
+def _setup() -> int:
+    """The station model the demo needs: ``scripts/setup_aspire.py`` clones ASPIRE at the pinned commit when the
+    clone is missing, then checks the commit and the station files. 0 when it is ready."""
+    import runpy
+    import subprocess
+
+    from .paths import REPO_ROOT
+
+    script = REPO_ROOT / "scripts" / "setup_aspire.py"
+    if not script.is_file():          # an installed copy has no scripts folder: the workers say what is missing
+        return 0
+    try:
+        return int(runpy.run_path(str(script), run_name="avail_setup")["main"]() or 0)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        detail = (getattr(exc, "stderr", None) or str(exc)).strip()
+        print(f"avail demo: the setup could not clone or check ASPIRE: {detail}", flush=True)
+        return 2
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="avail demo", description=__doc__.split("\n\n")[0])
     parser.add_argument("--connector", default="latch")
@@ -392,12 +413,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", default=None, help="the HTML report (default AVAIL_DATA/runs/demo/report.html)")
     parser.add_argument("--witness-file", default=None, help="an easy-mode witness file in place of the shipped one")
     parser.add_argument("--no-open", action="store_true", help="do not open the report in a browser")
+    parser.add_argument("--no-setup", action="store_true",
+                        help="do not clone or check ASPIRE's station model (scripts/setup_aspire.py)")
     args = parser.parse_args(argv)
     from .paths import check_disk_floor, runs_dir
 
     profiles = PROFILES if args.profile == "both" else (args.profile,)
     t0 = time.perf_counter()
     check_disk_floor()
+    if not args.no_setup:
+        code = _setup()
+        if code:
+            return code
     print(f"AVAIL demo: {args.n} simulated states per mode ({', '.join(profiles)}) for the {args.connector} connector "
           f"on {args.workers} workers...", flush=True)
     try:

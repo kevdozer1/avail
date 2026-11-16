@@ -1,13 +1,17 @@
 """``avail shift``: run a task's cycles on its testbed, and report them from the ledger alone.
 
     avail shift prepare --task cable_loop --variant latch            build the witnesses the cycles use (no test seed)
-    avail shift run --task cable_loop --variant latch --arm avail_human --seeds 20000:20100 --shift dev1 --workers 2
+    avail shift run --task cable_loop --variant latch --arm avail_simop --seeds 20000:20100 --shift dev1 --workers 2
     avail shift report --shift dev1                                   the shift card and the E3 table, from the ledgers
     avail shift export --shift dev1                                   intervention episodes, LeRobot-style, and labels
     avail shift e3 --variant latch --plan                            the E3 final run: its arms, seeds and cost, no cycle
     avail shift e3 --variant latch --final-run E3                    the E3 final run itself. Kevin starts it
     avail shift fig --plan                                           the README figure's run: arms, seeds, judge estimate
     avail shift fig --final-run FIG                                  the figure run itself (seeds 72,000 to 72,099)
+    avail shift e3b --plan                                           E3b, the 1 retest of the defect bar: plan and checks
+    avail shift e3b --final-run E3b                                  E3b itself (seeds from 80,000), from a frozen worktree
+    avail shift e4 --plan                                            E4, the cost of the defect bar: plan and checks
+    avail shift e4 --final-run E4                                    E4 itself (seeds from 40,000), from a frozen worktree
 
 Shift dev seeds are 20,000 to 23,999. The E3 test seeds (30,000 to 37,999) are read once, by
 ``avail shift e3 ... --final-run E3`` alone: ``run`` refuses ``--final-run E3``. Every run is resumable:
@@ -312,6 +316,128 @@ def _fig(parser, args) -> int:
     return 0
 
 
+E3B_RUN = "E3b"
+
+
+def e3b_plan() -> dict:
+    """E3b as config writes it: each arm's driver arm, cycles and the seeds they share from shift_test_e3b's start."""
+    from ..config import load_experiment
+
+    exp = load_experiment()
+    e3b, (lo, hi) = exp.e3b, exp.seeds.shift_test_e3b
+    arms = {}
+    for name, cycles in dict(e3b["arms"]).items():
+        n = int(cycles)
+        if lo + n - 1 > hi:
+            raise ValueError(f"e3b.arms.{name} asks for {n} cycles, more than shift_test_e3b ({lo} to {hi}) holds")
+        arms[name] = {"driver_arm": dict(e3b["driver_arms"])[name], "cycles": n, "seeds": [lo, lo + n - 1]}
+    return {"variant": e3b["variant"], "split": "shift_test_e3b", "arms": arms,
+            "alpha": exp.customer_bar["alpha_for_bar"]}
+
+
+def _e3b(parser, args) -> int:
+    """``avail shift e3b``: print the plan, check everything a read needs, then run each arm on the same seeds."""
+    plan = e3b_plan()
+    plan["setup_files"] = setup_hashes(args.task)
+    print(json.dumps({k: v for k, v in plan.items() if k != "setup_files"}, indent=1), flush=True)
+    record = _shift_dir("e3b_setup.json")
+    problems = [station_problem(args.task), prepare_problem(args.task, [plan["variant"]], plan.get("alpha")),
+                setup_problem(record, plan["setup_files"])]
+    problems = [p for p in problems if p]
+    if args.plan:
+        for line in problems:
+            print(f"\nbefore the run: {line}", flush=True)
+        if not problems:
+            print("\nbefore the run: no problem", flush=True)
+        return 0
+    if args.final_run != E3B_RUN:
+        parser.error("E3b reads its test seeds once. Pass --final-run E3b to start it")
+    if problems:
+        parser.error(problems[0])
+    if not record.is_file():
+        record.parent.mkdir(parents=True, exist_ok=True)
+        record.write_text(json.dumps({"task": args.task, "files": plan["setup_files"]}, indent=1),
+                          encoding="utf-8", newline="\n")
+    from .runner import run_shift
+
+    expected = json.loads(record.read_text(encoding="utf-8"))["files"]
+    for name, spec in plan["arms"].items():
+        changed = setup_problem(record, setup_hashes(args.task))
+        if changed:
+            parser.error(changed)
+        lo, hi = spec["seeds"]
+        run_shift(args.task, plan["variant"], spec["driver_arm"], list(range(lo, hi + 1)), shift=f"e3b_final_{plan['variant']}",
+                  run_root=_shift_dir(f"e3b_final_{plan['variant']}"), workers=args.workers, final_run=E3B_RUN,
+                  expected_setup=expected)
+    return 0
+
+
+E4_RUN = "E4"
+
+
+def e4_plan() -> dict:
+    """E4 as config writes it (docs/07, 2026-11-16): each arm's driver arm, cycles and the seeds they share from
+    shift_test_e4's start, and the hypotheses H4a and H4b."""
+    from ..config import load_experiment
+
+    exp = load_experiment()
+    e4, (lo, hi) = exp.e4, exp.seeds.shift_test_e4
+    arms = {}
+    for name, cycles in dict(e4["arms"]).items():
+        n = int(cycles)
+        if lo + n - 1 > hi:
+            raise ValueError(f"e4.arms.{name} asks for {n} cycles, more than shift_test_e4 ({lo} to {hi}) holds")
+        arms[name] = {"driver_arm": dict(e4["driver_arms"])[name], "cycles": n, "seeds": [lo, lo + n - 1]}
+    return {"variant": e4["variant"], "split": "shift_test_e4", "arms": arms, "h4a": dict(e4["h4a"]),
+            "h4b": dict(e4["h4b"]), "alpha": exp.customer_bar["alpha_for_bar"],
+            "check_witness": dict(exp.check_witness or {})}
+
+
+DEV_ONLY_ENV = ("AVAIL_WITNESS_ROOT", "AVAIL_SIMOP_OPERATOR")    # the flywheel's witness folder, step 4's operator
+
+
+def _e4(parser, args) -> int:
+    """``avail shift e4``: print the plan, check everything a read needs, then run each arm on the same seeds."""
+    import os
+
+    left = [name for name in DEV_ONLY_ENV if os.environ.get(name, "").strip()]
+    if left:                                       # refused before any hash is taken or any read is recorded (review)
+        parser.error(f"{', '.join(left)} is set in this shell. It is for dev runs only. Open a new shell for E4")
+    plan = e4_plan()
+    plan["setup_files"] = setup_hashes(args.task)
+    print(json.dumps({k: v for k, v in plan.items() if k != "setup_files"}, indent=1), flush=True)
+    record = _shift_dir("e4_setup.json")
+    problems = [station_problem(args.task), prepare_problem(args.task, [plan["variant"]], plan.get("alpha")),
+                setup_problem(record, plan["setup_files"])]
+    problems = [p for p in problems if p]
+    if args.plan:
+        for line in problems:
+            print(f"\nbefore the run: {line}", flush=True)
+        if not problems:
+            print("\nbefore the run: no problem", flush=True)
+        return 0
+    if args.final_run != E4_RUN:
+        parser.error("E4 reads its test seeds once. Pass --final-run E4 to start it")
+    if problems:
+        parser.error(problems[0])
+    if not record.is_file():
+        record.parent.mkdir(parents=True, exist_ok=True)
+        record.write_text(json.dumps({"task": args.task, "files": plan["setup_files"]}, indent=1),
+                          encoding="utf-8", newline="\n")
+    from .runner import run_shift
+
+    expected = json.loads(record.read_text(encoding="utf-8"))["files"]
+    for name, spec in plan["arms"].items():
+        changed = setup_problem(record, setup_hashes(args.task))
+        if changed:
+            parser.error(changed)
+        lo, hi = spec["seeds"]
+        run_shift(args.task, plan["variant"], spec["driver_arm"], list(range(lo, hi + 1)), shift=f"e4_final_{plan['variant']}",
+                  run_root=_shift_dir(f"e4_final_{plan['variant']}"), workers=args.workers, final_run=E4_RUN,
+                  expected_setup=expected)
+    return 0
+
+
 def load_fig_cycles() -> int:
     from ..config import load_experiment
 
@@ -327,7 +453,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run = sub.add_parser("run", help="run cycles of 1 arm")
     p_run.add_argument("--task", default="cable_loop")
     p_run.add_argument("--variant", required=True)
-    p_run.add_argument("--arm", required=True, choices=["flag", "vlm", "avail", "avail_human", "agent_looks"])
+    p_run.add_argument("--arm", required=True, choices=["flag", "vlm", "avail", "avail_simop", "agent_looks"])
     p_run.add_argument("--seeds", type=_seeds, required=True, help="low:high, high excluded")
     p_run.add_argument("--shift", required=True, help="the shift's name: its folder under AVAIL_DATA/runs/shifts")
     p_run.add_argument("--workers", type=int, default=2)
@@ -354,10 +480,24 @@ def main(argv: list[str] | None = None) -> int:
     p_fig.add_argument("--final-run", default=None)
     p_fig.add_argument("--workers", type=int, default=4)
     p_fig.add_argument("--arm", action="append", default=None, help="run only these arms (repeat)")
+    p_e3b = sub.add_parser("e3b", help="E3b, the 1 retest of the defect bar (H3b)")
+    p_e3b.add_argument("--task", default="cable_loop")
+    p_e3b.add_argument("--plan", action="store_true", help="print the plan and what a read needs, and stop")
+    p_e3b.add_argument("--final-run", default=None)
+    p_e3b.add_argument("--workers", type=int, default=4)
+    p_e4 = sub.add_parser("e4", help="E4, the cost of the defect bar (H4a and H4b)")
+    p_e4.add_argument("--task", default="cable_loop")
+    p_e4.add_argument("--plan", action="store_true", help="print the plan and what a read needs, and stop")
+    p_e4.add_argument("--final-run", default=None)
+    p_e4.add_argument("--workers", type=int, default=4)
     args = parser.parse_args(argv)
 
     if args.command == "fig":
         return _fig(parser, args)
+    if args.command == "e3b":
+        return _e3b(parser, args)
+    if args.command == "e4":
+        return _e4(parser, args)
 
     if args.command == "prepare":
         import importlib
@@ -376,9 +516,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{args.task} {variant}: " + ", ".join(f"{k} {v}" for k, v in made.items()), flush=True)
         return 0
     if args.command == "run":
-        if args.final_run in (FINAL_RUN, FIG_RUN):
-            parser.error(f"the {args.final_run} split is read by its own command alone (`avail shift e3` or `avail shift "
-                         "fig`), which checks the caps, the witnesses and the setup record before any seed is read")
+        if args.final_run in (FINAL_RUN, FIG_RUN, E3B_RUN, E4_RUN):
+            parser.error(f"the {args.final_run} split is read by its own command alone (`avail shift e3`, `fig`, "
+                         "`e3b` or `e4`), which checks the caps, the witnesses and the setup record before any seed is read")
         from .runner import run_shift
 
         summary = run_shift(args.task, args.variant, args.arm, args.seeds, shift=args.shift, run_root=_shift_dir(args.shift),

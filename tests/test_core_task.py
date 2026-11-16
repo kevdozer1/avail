@@ -117,22 +117,36 @@ def test_a_cycle_is_every_step_for_every_item_in_order():
     assert [item for item, _, _ in cycle] == sorted(item for item, _, _ in cycle)
 
 
+def _cable_loop_as_e3_ran_it():
+    """The cable loop with its held rule as E3 ran it. Since the S5c fix (2026-11-13) no task file holds a rule, and
+    the rule machinery is still core."""
+    from avail.core.task import TaskSpec
+
+    raw = load_task("cable_loop").model_dump(mode="json")
+    raw["predicates"]["held"]["decide"] = {
+        "kind": "rule", "accept_all": [{"feature": "passive.jaw_hold/in_band", "above": 0.5},
+                                       {"feature": "vision.cable_tag/match", "above": 0.5}],
+        "reject_any": [{"feature": "passive.jaw_hold/closed_empty", "above": 0.5},
+                       {"feature": "vision.cable_tag/mismatch", "above": 0.5}]}
+    return TaskSpec.model_validate(raw)
+
+
 def test_every_rule_in_the_task_files_reads_only_its_own_checks_and_can_accept():
     rules = 0
-    for name in task_names():
-        for predicate in load_task(name).predicates.values():
+    for task in [load_task(name) for name in task_names()] + [_cable_loop_as_e3_ran_it()]:
+        for predicate in task.predicates.values():
             if predicate.decide.kind == "rule":
                 rules += 1
                 assert predicate.decide.accept_all, predicate.name
                 assert {c.check for c in predicate.decide.conditions()} <= set(predicate.checks), predicate.name
-    assert rules >= 1, "the task files hold no rule, so this test checked nothing"
+    assert rules >= 1, "no rule was found, so this test checked nothing"
 
 
 def test_a_witness_name_resolves_the_variant():
     plug = load_task("plug_insert")
     assert plug.predicate_for("insert", "latch").decide.witness_for("latch") == "latch"
     assert plug.predicate_for("insert", "fric").name == "seated"
-    rule = next(p for p in load_task("cable_loop").predicates.values() if p.decide.kind == "rule")
+    rule = next(p for p in _cable_loop_as_e3_ran_it().predicates.values() if p.decide.kind == "rule")
     with pytest.raises(ValueError, match="rule"):
         rule.decide.witness_for("latch")
 

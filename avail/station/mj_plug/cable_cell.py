@@ -49,9 +49,27 @@ HELD_TILT_DEG = 4.0                   # truth of held: the plug's axis within th
 AT_PORT_LATERAL_MM = 1.5              # truth of at_port: the tip within this of the port's axis (chamfer plus clearance)
 
 
+def _lift_record(force_z: list[float], before_z: float) -> dict:
+    """What the release skill keeps of its lift: the wrist's force along z on each control tick, against its value
+    before the jaws opened. Its peak, its low and its mean over the 1st quarter of the lift."""
+    force = np.asarray(force_z or [before_z], dtype=float) - float(before_z)
+    force = force[np.isfinite(force)] if np.isfinite(force).any() else np.zeros(1)
+    early = force[: max(1, len(force) // 4)]
+    return {"lift_peak_n": float(force.max()), "lift_min_n": float(force.min()), "lift_early_mean_n": float(early.mean())}
+
+
 @lru_cache(maxsize=2)
 def cell_config(path: str | None = None) -> dict:
     return yaml.safe_load(Path(path or CELL_YAML).read_text(encoding="utf-8"))
+
+
+def _rung(name: str):
+    """The module of a ladder rung (``rung_<name>.py`` beside this file)."""
+    import importlib
+
+    if name not in CableCell.RUNGS:
+        raise KeyError(f"no rung {name!r}. Known: {', '.join(CableCell.RUNGS)}")
+    return importlib.import_module(f"{__package__}.rung_{name}")
 
 
 @dataclass
@@ -99,6 +117,10 @@ class CableCell:
         self.latch_blocked_for: set[int] = set()
         self.hover_xy: dict[int, tuple[float, float]] = {}      # where the last carry took each cable, board x and y
         self.release_log: dict[int, list[dict]] = {}            # the release skill's own record, per cable and attempt
+        # S5c enrichment only (docs/07, 2026-11-13): (low, high) degrees of tip given to the plug as the jaws open on a
+        # 1st release try. None everywhere else, so no shift and no E3b cycle ever has it
+        self.release_tip: tuple[float, float] | None = None
+        self._seat_offsets: list[list[float]] = []      # S5c fix: tool xy minus taught seated xy, each insertion home by its flag
         # the frame log and what a replay needs
         self.frames: list[dict] = []
         self.scene_events: list[dict] = []
@@ -106,6 +128,7 @@ class CableCell:
         self.item_now, self.step_now = -1, ""
         self._next_frame_t = 0.0
         self._extra_hook = None
+        self._force_log: list[float] | None = None
         st._tick_hook = self._on_tick
         self._place_rack()
         self._hide_physical()
@@ -173,9 +196,18 @@ class CableCell:
 
     # ------------------------------------------------------------------ the world
 
+    def _wrist_force(self) -> np.ndarray:
+        """The wrist's force estimate as the arm reads it, without drawing the read stream's noise, so sampling it
+        changes nothing later in the cycle."""
+        st = self.station
+        _, _, jac = st._jac(ARM, st._q_read(ARM))
+        return np.asarray(st._tool_force(ARM, jac), dtype=float)
+
     def _on_tick(self) -> None:
         if self._extra_hook is not None:
             self._extra_hook()
+        if self._force_log is not None:                 # the release skill's lift is running (S5c fix)
+            self._force_log.append(float(self._wrist_force()[2]))
         t = float(self.station._mj_data.time)
         if t + 1e-9 >= self._next_frame_t:
             # on a fixed 20 Hz grid. Stepping from the tick's own time drifted to 1 frame per 13 ticks of 4 ms, 19.2 Hz
@@ -245,6 +277,33 @@ class CableCell:
         st._mj.mj_kinematics(st._mj_model, st._mj_data)
         site = st._lay.ids["site:plug_shoulder"]
         return st._mj_data.site_xpos[site].copy(), st._mj_data.site_xmat[site].reshape(3, 3).copy()
+
+    def _tip_plug(self, item: int, attempt: int) -> str:
+        """Enrichment only (docs/07, 2026-11-13): tip the plug, just let go, by an angle drawn from ``release_tip``
+        about a horizontal axis of drawn direction, pivoting on its shoulder at the socket face. That is what the
+        opening did on dev seed 21,188 (0.8 to 3.4 degrees) before the lift dragged the plug up. The lift that follows
+        is the skill's own and unchanged, so any drag, and its force, is the simulator's. A draw of its own, so no other
+        draw of the cycle changes. Returns the failure's name for the evaluator's record."""
+        st = self.station
+        rng = np.random.default_rng([self.seed, self._c, item, attempt, 9191])
+        lo, hi = self.release_tip
+        theta = math.radians(float(rng.uniform(lo, hi)))
+        phi = float(rng.uniform(0.0, 2.0 * math.pi))
+        axis = np.array([math.cos(phi), math.sin(phi), 0.0])
+        k = np.array([[0.0, -axis[2], axis[1]], [axis[2], 0.0, -axis[0]], [-axis[1], axis[0], 0.0]])
+        turn = np.eye(3) + math.sin(theta) * k + (1.0 - math.cos(theta)) * (k @ k)      # Rodrigues
+        data, ids = st._mj_data, st._lay.ids
+        qa, va = ids["plug_qadr"], ids["plug_dadr"]
+        pos = data.qpos[qa:qa + 3].copy()
+        rot = Pose((0, 0, 0), tuple(data.qpos[qa + 3:qa + 7])).rotation()
+        shoulder, _ = self._plug_pose()
+        new_rot = turn @ rot
+        new_pos = shoulder + turn @ (pos - shoulder)
+        data.qpos[qa:qa + 3] = new_pos
+        data.qpos[qa + 3:qa + 7] = Pose.from_matrix(new_pos, new_rot).quat
+        data.qvel[va:va + 6] = 0.0
+        st._mj.mj_forward(st._mj_model, data)
+        return f"release_tip_{math.degrees(theta):.1f}deg"
 
     def _hide_physical(self) -> None:
         st = self.station
@@ -588,18 +647,32 @@ class CableCell:
             ok = insert is not None
         elif step == "release":
             held = self.holding()
+            force_before = self._wrist_force()
             if held and rng.random() < fail["stuck_release"]:
                 failure = "stuck_release"               # the fingers do not open
                 st.wait(0.3)
             else:
                 st.set_gripper(ARM, 1.0)
+                if self.release_tip is not None and held and attempt == 0 and self.physical == item:
+                    failure = self._tip_plug(item, attempt)    # enrichment tables only: the opening tips the plug
+            # the wrist's force as the jaws opened (S5c fix): a plug that was pressed or pulled as it was let go shows here
+            open_force_change = self._wrist_force() - force_before
             if held and self.physical is not None:
                 self.release_ref[self.physical] = plug_metrics(st)["plug_pos"]
             state = st.robot_state().arms[ARM]          # the skill's own record: its gripper reading before it lifts
             pose = state.tool_pose
-            self.release_log.setdefault(item, []).append({"attempt": int(attempt), "jaw_before_lift": float(state.gripper_pos),
-                                                          "lift_mm": RELEASE_LIFT_M * 1000.0})
+            seat_z = float(st.nominal().seated_tool_pose(cable.port).pos[2])
+            entry = {"attempt": int(attempt), "jaw_before_lift": float(state.gripper_pos),
+                     "lift_mm": RELEASE_LIFT_M * 1000.0, "open_above_seat_mm": (float(state.tool_pose.pos[2]) - seat_z) * 1000.0,
+                     "open_force_dz_n": float(open_force_change[2]),
+                     "open_force_dxy_n": float(np.hypot(open_force_change[0], open_force_change[1]))}
+            self.release_log.setdefault(item, []).append(entry)
+            # the lift is the same position move as before. The wrist's force is sampled on every control tick while it
+            # runs (S5c fix), so the record shows a plug that rode up with the fingers, and the motion does not change
+            self._force_log = []
             st.move_to_pose(ARM, Pose((pose.pos[0], pose.pos[1], pose.pos[2] + RELEASE_LIFT_M), pose.quat), 0.03)
+            entry.update(_lift_record(self._force_log, float(force_before[2])))
+            self._force_log = None
             st.wait(self._exp.predicates["released_stable"]["settle_s"])
             flag = True
         else:
@@ -608,8 +681,9 @@ class CableCell:
         return SkillResult(step=step, item=item, ok=bool(ok), flag=bool(flag), seconds=float(st._mj_data.time) - t0,
                            note=note, insert=insert, failure=failure, release=release)
 
-    def _insert(self, item: int, rng: np.random.Generator, attempt: int):
-        """The insertion: from the pre-insert pose, the zoo's force-guarded descent, with a failure drawn from the mix."""
+    def _insert(self, item: int, rng: np.random.Generator, attempt: int, *, no_failure: bool = False):
+        """The insertion: from the pre-insert pose, the zoo's force-guarded descent, with a failure drawn from the mix.
+        ``no_failure``: the descent alone, with no failure drawn (the ladder's reinsert rung, docs/07 2026-11-16)."""
         st = self.station
         exp, fail, mix_cfg = self._exp, self.cfg["failures"], self.cfg["insert_failures"]
         cable = self.cables[item]
@@ -622,7 +696,7 @@ class CableCell:
                 st.move_relative(ARM, [0.0, 0.0, 0.02], "base", 0.01, self.pull_out_force_n(), 0.025)
         else:
             self._regrasp(self._loose_target(item), rng, bad_p=0.0)
-        if rng.random() < fail["insert"]:
+        if not no_failure and rng.random() < fail["insert"]:
             mix = {k: v for k, v in exp.standin_s1["failure_mix"].items() if k != "wrong_port"}   # that one is the carry's
             kinds = sorted(mix)
             p = np.array([mix[k] for k in kinds], float)
@@ -670,6 +744,12 @@ class CableCell:
             self._extra_hook = None
         st.wait(0.3)
         flag = bool(res.stopped_by == "force" and abs(res.travel_m - expected) <= FLAG_TOL_M)
+        if flag:
+            # the robot's own estimate of where the board really is (S5c fix): its tool, home in a port by its own
+            # record, against the taught seated pose. Read from the joint readings without the read stream's noise
+            pos, _ = st._fk(ARM, st._q_read(ARM))
+            self._seat_offsets.append(((np.asarray(pos[:2], float) - np.asarray(nominal.seated_tool_pose(port).pos[:2], float))
+                                       * 1000.0).tolist())
         if failure == "early_release":
             st.set_gripper(ARM, 1.0)                    # it lets go short of home and calls it done
             self.release_ref[self.physical] = plug_metrics(st)["plug_pos"]
@@ -679,6 +759,18 @@ class CableCell:
                   "expected_travel_mm": expected * 1000.0, "force_at_stop_n": res.force_at_stop_n,
                   "peak_force_n": res.peak_force_n, "seconds": res.duration_s, "trace": res.trace}
         return record, failure, flag
+
+    # ------------------------------------------------------------------ the escalation ladder (docs/07, 2026-11-16)
+    RUNGS = ("relook", "regrip", "reinsert")            # reseat was dropped on 2026-11-16 (archive/s5d_rung_reseat)
+
+    def rung_begin(self, name: str, item: int, step: str):
+        """A rung of the ladder: the cell's recovery action, 1 file each (``rung_<name>.py``). Returns the step's new
+        result when the rung made one (a new carry or insertion), else None."""
+        self.item_now, self.step_now = item, step
+        return _rung(name).begin(self, item, step)
+
+    def rung_end(self, name: str, item: int, step: str) -> None:
+        _rung(name).end(self, item, step)
 
     def _free_neighbors(self, port: int) -> list[int]:
         cfg = self._exp.station.board
@@ -714,6 +806,8 @@ class CableCell:
         release = getattr(result, "release", None)
         if release is not None:
             params["release"] = release
+        if self._seat_offsets:                           # the board's offset as the robot measured it this cycle
+            params["board_offset_mm"] = [float(v) for v in np.median(np.asarray(self._seat_offsets), axis=0)]
         return params
 
     def close(self) -> None:

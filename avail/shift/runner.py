@@ -91,7 +91,7 @@ def run_block(args: tuple) -> dict:
     from ..core.task import load_task
     from ..ledger.writer import LedgerWriter
     from ..seeds import assert_simulable, unlock_final_run
-    from .driver import CycleDriver
+    from .driver import GATED_ARMS, OPERATOR_ARMS, CycleDriver
 
     unlock_final_run(final_run)
     task = load_task(task_name)
@@ -115,8 +115,8 @@ def run_block(args: tuple) -> dict:
             assert_simulable(seed)
             cell = bed.make_cell(seed, variant, profile)
             try:
-                witnesses = bed.make_witnesses(task, variant, alpha) if arm in ("avail", "avail_human") else {}
-                human = bed.make_human(cell, seed) if arm == "avail_human" else None
+                witnesses = bed.make_witnesses(task, variant, alpha) if arm in GATED_ARMS else {}
+                human = bed.make_human(cell, seed) if arm in OPERATOR_ARMS else None
                 driver = CycleDriver(task, cell, arm, witnesses=witnesses, human=human, ledger=ledger, judge=judge,
                                      run_id=run_id, cycle_id=cycle_id_for(run_id, seed, started),
                                      evaluator=bed.evaluator(cell))
@@ -162,7 +162,10 @@ def _cycle_end(ledger, driver, log, truth: dict, seed: int, arm: str, variant: s
                        forks=log.forks, usd=log.usd,
                        time_s={"motion": log.motion_s, "verify": log.verify_s, "model": log.model_s,
                                "wait": log.wait_s, "handling": log.handling_s},
-                       steps=list(driver.audit))     # evaluator-side: each step declared done or not, and whether it was
+                       steps=list(driver.audit),     # evaluator-side: each step declared done or not, and whether it was
+                       # evaluator-side too (2026-11-16): every verdict with its claim's truth after the witness ran,
+                       # and every rung of the ladder with the truth before and after it
+                       claims=list(getattr(driver, "claim_audit", [])), rungs=list(getattr(driver, "rung_audit", [])))
     ledger.append("cycle_end", payload)
 
 

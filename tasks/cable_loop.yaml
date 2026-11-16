@@ -17,6 +17,12 @@
 # also reads passive.release_record. On dev1 a stuck release lifted the plug out of its port and the
 # retry opened the jaws above it. The rule, which read only the jaws, accepted 11 such releases in 100
 # cycles of the avail arm, 11 of the 12 bad releases it accepted.
+# Changed after E3 (2026-11-13, S5c fix), before any E3b seed was read: held, at_port and released_stable no
+# longer use the hand-set rules below. All 31 of E3's uncaught failures passed the released_stable rule. Each
+# now uses a witness calibrated like the insertion's, fit on check_fit and calibrated on check_calibration
+# (avail/station/mj_plug/check_zoo.py) at the customer bar's alpha, with the operator on abstain. released_stable
+# also reads passive.release_lift, the release skill's record of the wrist's force as the jaws opened and as it
+# lifted away. The rules' thresholds are kept in the comments for the record.
 task: cable_loop
 title: Pick each cable from the tray, carry it to its assigned port, insert it and let go of it
 testbed: avail.station.mj_plug.cable_shift
@@ -30,28 +36,15 @@ predicates:
   held:
     done_means: The gripper holds the named cable, and no other cable, in its jaws.
     checks: [passive.jaw_hold, vision.cable_tag]
-    decide:
-      kind: rule
-      accept_all:
-        - {feature: passive.jaw_hold/in_band, above: 0.5}       # the jaws stopped on a body of the plug's width
-        - {feature: vision.cable_tag/match, above: 0.5}         # the color in the jaws is the named cable's
-      reject_any:
-        - {feature: passive.jaw_hold/closed_empty, above: 0.5}  # the jaws closed on nothing
-        - {feature: vision.cable_tag/mismatch, above: 0.5}      # another cable's color is in the jaws
+    decide: {kind: witness, witness: "{variant}"}
+    # the hand-set rule until 2026-11-13: accept when passive.jaw_hold/in_band and vision.cable_tag/match are above 0.5,
+    # reject when passive.jaw_hold/closed_empty or vision.cable_tag/mismatch is
   at_port:
     done_means: The named cable hangs straight in the jaws, its tip over the mouth of its assigned port and no other port, ready to go in.
-    checks: [passive.hover_pose, passive.jaw_hold, vision.cable_tag]
-    decide:
-      kind: rule
-      accept_all:
-        - {feature: passive.hover_pose/port_match, above: 0.5}  # the nearest taught port is the assigned one
-        - {feature: passive.hover_pose/in_band, above: 0.5}     # within 3 mm of its taught pre-insert pose. A cable cocked in the jaws puts the tool off it
-        - {feature: passive.jaw_hold/in_band, above: 0.5}
-      reject_any:
-        - {feature: passive.hover_pose/port_match, below: 0.5}
-        - {feature: passive.hover_pose/lateral_mm, above: 6.0}  # 6 mm off is a cocked cable or a wrong port, whatever else holds
-        - {feature: passive.jaw_hold/closed_empty, above: 0.5}
-        - {feature: vision.cable_tag/mismatch, above: 0.5}
+    checks: [passive.hover_pose, passive.hover_offset, passive.jaw_hold, vision.cable_tag]
+    decide: {kind: witness, witness: "{variant}"}
+    # the hand-set rule until 2026-11-13: accept when passive.hover_pose/port_match, passive.hover_pose/in_band (3 mm)
+    # and passive.jaw_hold/in_band hold, reject on a port mismatch, more than 6 mm sideways, empty jaws or a color mismatch
   seated:
     done_means: The cable's plug is in its assigned port, its shoulder is flush with the socket face within the depth tolerance, and it sits straight.
     checks: [passive.skill_flag, passive.pose_residual, passive.jaw_state, passive.click, vision.gap@claim, probe.push_seat, probe.tug, vision.gap@now]
@@ -62,15 +55,20 @@ predicates:
     decide: {kind: witness, witness: "{variant}"}
   released_stable:
     done_means: The gripper has let go of the cable and its plug has stayed seated in its assigned port.
-    checks: [passive.jaw_hold, passive.release_record, vision.gap@now]
-    decide:
-      kind: rule
-      accept_all:
-        - {feature: passive.jaw_hold/open, above: 0.5}           # the jaws are open. The insert step already verified the seat
-      reject_any:
-        - {feature: passive.jaw_hold/open, below: 0.5}           # the fingers did not open
-        - {feature: passive.release_record/lifted_closed, above: 0.5}  # a try lifted with the jaws shut and took the plug up with it
-        - {feature: vision.gap@now/gap_mm_est, above: 2.0}       # the camera, when it reads the port, sees the plug come up
+    checks: [passive.jaw_hold, passive.release_record, passive.release_lift, vision.gap@now, probe.release_tug]
+    decide: {kind: witness, witness: "{variant}"}
+    # the hand-set rule until 2026-11-13: accept when passive.jaw_hold/open is above 0.5, reject when the jaws were
+    # not open, a try lifted with them shut, or vision.gap@now/gap_mm_est read more than 2.0 mm
 fork:
   max_attempts: 2
   ask: {abstain: confirm, reject_last: choose, at_port_reject: guide_marks}
+  # 2026-11-16 (docs/07, step 2): the escalation ladder. Before a call to the operator, after an abstain or a last reject,
+  # the cell tries these in order, each followed by the same witness on a fresh claim of the step. Only the witness accepts.
+  # relook: the held cable seen from a 2nd wrist pose, no contact. regrip: the cable set back in its slot, taken again
+  # straight and carried over its port. reinsert: the plug pulled out, taken again straight and inserted again under the
+  # push cap. released_stable has no rung: the reseat rung (the released plug pushed home) made no bad release good and
+  # left 2 states the release witness wrongly accepted on the gate's 1st 154 dev cycles (docs/07, 2026-11-16)
+  ladder: {held: [relook], at_port: [regrip], latched: [reinsert]}
+  # a look from elsewhere at a state no rung changed is a 2nd chance for a false accept, so held's relook follows an
+  # abstain only. A regrip or a reinsert makes a fresh carry or insertion, so those follow an abstain or a last reject
+  ladder_after: {held: [abstain]}

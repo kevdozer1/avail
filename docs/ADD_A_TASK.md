@@ -44,10 +44,16 @@ fork:
   ask: {abstain: confirm, reject_last: choose, at_port_reject: guide_marks}
 ```
 
+This is the task file as E3 ran it. After E3 (2026-11-13) `held`, `at_port` and `released_stable` were decided by
+calibrated witnesses too (`decide: {kind: witness, witness: "{variant}"}`), and on 2026-11-16 `fork` gained a `ladder`
+of recovery actions. `tasks/cable_loop.yaml` is the file as it stands now. The rule form above still works for a new
+task.
+
 - **Steps** run in order for each item. Each raises 1 claim. A variant (the plug station's connector type) can swap a step's predicate, as `latch` swaps `seated` for `latched`. `judge: true` marks the steps the E3 vlm arm's judge decides. That arm trusts the skill's own flag on the rest.
 - **`done_means`** is the definition a person applies when asked, and the one every claim carries. The schemas take predicate definitions from the task files, so a new predicate needs no code.
-- **`decide`** is either a rule witness or a calibrated witness. A rule witness accepts when every `accept_all` condition holds, rejects when any `reject_any` condition holds, and abstains otherwise. Its conditions name features as `<check>/<feature>`. A calibrated witness is a cascade fit and calibrated on labeled states (E2), read from the witness store. The cable loop uses rules for its 3 new predicates and the zoo's cascade at the customer bar's alpha for `seated` and `latched`.
+- **`decide`** is either a rule witness or a calibrated witness. A rule witness accepts when every `accept_all` condition holds, rejects when any `reject_any` condition holds, and abstains otherwise. Its conditions name features as `<check>/<feature>`. A calibrated witness is a cascade fit and calibrated on labeled states (E2), read from the witness store. Through E3 the cable loop used rules for its 3 new predicates, and a cascade fit and calibrated on its own insertions (`cable_zoo.py`) at the customer bar's alpha for `seated` and `latched`. Since E3 the other 3 are calibrated witnesses as well (`check_zoo.py`).
 - **`fork`** sets the attempts and what a person is asked: `confirm` after an abstain, `choose` after the last reject, and `guide_marks` after the last `at_port` reject. A key `<predicate>_reject` sets the question for that predicate's last reject.
+- **`fork.ladder`** (2026-11-16) lists, per predicate, the testbed's recovery actions to try before the 1st call on a step, each followed by the same witness on a fresh claim. Only the witness can accept after one. `fork.ladder_after` says whether a predicate's ladder follows an abstain, a last reject or both. The cable loop's are `relook` for `held`, `regrip` for `at_port` and `reinsert` for `latched`.
 
 ## Step 2. Write the checks it needs, 1 file each
 
@@ -82,13 +88,15 @@ The cable loop needed 4:
 
 The last 2 rows changed after the dev shift dev1, before any shift test seed was read. `vision.cable_tag` compared RGB distances, and a seed's lighting scales a rendered color, so it saw no cable on about 1 pick in 5 and called a person. `passive.release_record` is new: a stuck release lifted plugs out of their ports, and the rule that read only the jaws accepted the retry.
 
+After E3, 3 more joined the witnesses: `passive.hover_offset` for `at_port` (the hover pose against the board's offset as the robot measured it), `passive.release_lift` for `released_stable` (the wrist's force as the jaws opened and as it lifted away) and `probe.release_tug` for `released_stable` (the jaws close on the released plug again and pull it below the latch's hold).
+
 ## Step 3. Write the testbed module
 
 The task file names it under `testbed:`. The shift runner imports it by that name and calls:
 
 | Function | Returns |
 |---|---|
-| `make_cell(seed, variant, profile)` | the cell the cycle driver runs: `run_skill`, `claim_params(item, step, result)`, `view`, `target_of(item)`, `now`, `begin_assist`, `end_assist`, `n_items`, `variant`. A person's marks reach `run_skill` on the next try. The cable cell's taught palette comes from `uv run python -m avail.station.mj_plug.cable_teach` |
+| `make_cell(seed, variant, profile)` | the cell the cycle driver runs: `run_skill`, `claim_params(item, step, result)`, `view`, `target_of(item)`, `now`, `begin_assist`, `end_assist`, `n_items`, `variant`, and `rung_begin` and `rung_end` for a task file with a `fork.ladder`. A person's marks reach `run_skill` on the next try. The cable cell's taught palette comes from `uv run python -m avail.station.mj_plug.cable_teach` |
 | `make_witnesses(task, variant, alpha)` | 1 witness per predicate: rules from the task file, cascades from the witness store |
 | `make_human(cell, seed)` | the person behind the fork. In sim, OracleHuman answers from truth and plays the teleop source of a takeover. Its `Handback` says whether the step was done when they took the arm (`before`) and after (`ok`) |
 | `make_judge(session=...)` | the vlm arm's judge, charged to the spend session the runner names |
@@ -102,9 +110,25 @@ The task file names it under `testbed:`. The shift runner imports it by that nam
 
 ## Step 4. Run it
 
+The cable loop's witnesses are built from tables under `AVAIL_DATA`, which do not ship. These 6 commands make the
+tables on the seeds E3b's witnesses were made from. Together they simulate about 5,000 cycles, which takes hours. With
+this snapshot's `check_witness` settings in `config/experiment.yaml`, the witnesses built from them are the ones of
+2026-11-16, which differ from E3b's:
+
+```powershell
+uv run python -m avail.station.mj_plug.cable_zoo --variant latch --split cable_fit --seeds 24000:25000
+uv run python -m avail.station.mj_plug.cable_zoo --variant latch --split cable_calibration --seeds 26000:27000
+uv run python -m avail.station.mj_plug.check_zoo --variant latch --split check_fit
+uv run python -m avail.station.mj_plug.check_zoo --variant latch --split check_calibration
+uv run python -m avail.station.mj_plug.check_zoo --variant latch --split check_fit_drag
+uv run python -m avail.station.mj_plug.check_zoo --variant latch --split check_calibration_drag
+```
+
+Then:
+
 ```powershell
 uv run avail shift prepare --task cable_loop --variant latch
-uv run avail shift run --task cable_loop --variant latch --arm avail_human --seeds 20200:20300 --shift dev3 --workers 2
+uv run avail shift run --task cable_loop --variant latch --arm avail_simop --seeds 20200:20300 --shift dev3 --workers 2
 uv run avail shift report --shift dev3
 uv run avail shift export --shift dev3
 ```
@@ -157,6 +181,12 @@ The core was separated from the plug station on the night the cable loop was add
 | 15 | A claim gets 1 calibration label: a takeover right after the person's own labeled answer on it adds none. An Assist record lists the answers the person was offered | a confirm answered no on the last try and the takeover after it labeled the same evidence twice, and the Assist listed the fork's menu |
 
 Changes 2 to 5 were bugs in new core code that the cable loop ran 1st. Changes 9 to 15 came from 2 reviews of the core and the testbed, and none names the task. Later checks of the reports and the E3 command added to change 13. Changes 5 to 15 were made after the dev shift dev1 started, which ran from a frozen copy of the code. dev1's ledgers list a cycle's items as a count, so the done gate cannot rebuild a dev1 cycle from them. After change 7 the new driver gave the same cycles on dev seeds 20,003 and 20,004 in the avail arm: the same items done, the same forks, and the same 102.42 and 84.71 s of motion.
+
+**After E3 (2026-11-13 to 2026-11-16).** 4 more changes, and none names the task: a stage whose 2 thresholds cross
+may accept above its accept threshold (`crossing` in `avail/stats/conformal.py` and `avail/witness/cascade.py`), the
+task file's `fork.ladder` and the cycle driver that runs it (`avail/core/task.py`, `avail/shift/driver.py`), a
+bootstrap bound on a mean for E4's calls for help (`avail/stats/bootstrap.py`), and takeovers written as correction
+demos in documented JSONL (`avail/flywheel/corrections.py`).
 
 **Still in the core with the plug station's shape.**
 

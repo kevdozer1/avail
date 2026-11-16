@@ -206,7 +206,21 @@ def _threshold(func: str, name: str, value) -> float:
     return number
 
 
-def decide(score, tau_reject: float, tau_accept: float) -> str:
+CROSSINGS = ("abstain", "accept")
+
+
+def _crossed(func: str, low: float, high: float, crossing: str) -> tuple[float, float]:
+    """The (reject below, accept above) pair the rule uses, after the crossing case."""
+    if crossing not in CROSSINGS:
+        raise ValueError(f"{func}: crossing must be one of {CROSSINGS}, got {crossing!r}")
+    if low > high:
+        if crossing == "accept":
+            return high, high       # accept above tau_accept, reject below it: no band between
+        return high, low
+    return low, high
+
+
+def decide(score, tau_reject: float, tau_accept: float, crossing: str = "abstain") -> str:
     """The 3-way decision of 1 stage: ``"accept"``, ``"reject"`` or ``"abstain"``.
 
     - accept when ``score > tau_accept``
@@ -216,9 +230,15 @@ def decide(score, tau_reject: float, tau_accept: float) -> str:
     Ties abstain. A score equal to ``tau_accept`` is not accepted and a score
     equal to ``tau_reject`` is not rejected.
 
-    If the 2 thresholds cross (``tau_reject > tau_accept``), the stage accepts
-    only above the larger one and rejects only below the smaller one. The
-    region between them abstains, and both error bounds still hold.
+    If the 2 thresholds cross (``tau_reject > tau_accept``), ``crossing`` says what
+    the region between them does. ``"abstain"`` (the default): the stage accepts
+    only above the larger one and rejects only below the smaller one, and the
+    region between them abstains. ``"accept"`` (2026-11-16, docs/07): the stage
+    accepts above ``tau_accept`` and rejects below it. A false accept needs a
+    score above ``tau_accept`` either way, so its bound is ``alpha`` in both, and
+    a reject below the smaller threshold is also below ``tau_reject``, so the
+    false-reject bound ``beta`` holds in both. The default leaves part of the
+    false-accept budget unspent. That is all the 2 rules differ in.
 
     A score of NaN or None abstains: no evidence, no verdict. ``tau_accept = inf``
     is a stage that never accepts. ``tau_reject = -inf`` is a stage that never
@@ -227,8 +247,7 @@ def decide(score, tau_reject: float, tau_accept: float) -> str:
     """
     low = _threshold("decide", "tau_reject", tau_reject)
     high = _threshold("decide", "tau_accept", tau_accept)
-    if low > high:
-        low, high = high, low
+    low, high = _crossed("decide", low, high, crossing)
     if score is None:
         return ABSTAIN
     if not check.is_real(score):
@@ -244,7 +263,7 @@ def decide(score, tau_reject: float, tau_accept: float) -> str:
     return ABSTAIN
 
 
-def decide_many(scores, tau_reject: float, tau_accept: float) -> np.ndarray:
+def decide_many(scores, tau_reject: float, tau_accept: float, crossing: str = "abstain") -> np.ndarray:
     """``decide`` applied to a 1-D array of scores.
 
     Returns an array of the same length holding ``"accept"``, ``"reject"`` or
@@ -252,8 +271,7 @@ def decide_many(scores, tau_reject: float, tau_accept: float) -> np.ndarray:
     """
     low = _threshold("decide_many", "tau_reject", tau_reject)
     high = _threshold("decide_many", "tau_accept", tau_accept)
-    if low > high:
-        low, high = high, low
+    low, high = _crossed("decide_many", low, high, crossing)
     values = _score_array("decide_many", "scores", scores)
     out = np.full(values.shape, ABSTAIN, dtype="<U7")
     out[values > high] = ACCEPT     # comparisons with NaN are False, so NaN stays abstain

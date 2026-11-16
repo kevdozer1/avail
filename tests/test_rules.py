@@ -173,17 +173,55 @@ def _meeting(conditions: list[RuleCondition]) -> float:
     return low + 1.0 if low is not None else (high - 1.0 if high is not None else 0.0)
 
 
+# The cable loop's 3 hand-set rules as they stood until 2026-11-13, when calibrated witnesses replaced them (S5c fix).
+# The rule machinery is still core, and these are the real rules it ran on through E3.
+CABLE_RULES_UNTIL_S5C = yaml.safe_load("""
+held:
+  done_means: The gripper holds the named cable, and no other cable, in its jaws.
+  checks: [passive.jaw_hold, vision.cable_tag]
+  decide:
+    kind: rule
+    accept_all: [{feature: passive.jaw_hold/in_band, above: 0.5}, {feature: vision.cable_tag/match, above: 0.5}]
+    reject_any: [{feature: passive.jaw_hold/closed_empty, above: 0.5}, {feature: vision.cable_tag/mismatch, above: 0.5}]
+at_port:
+  done_means: The named cable hangs straight in the jaws, its tip over the mouth of its assigned port and no other port, ready to go in.
+  checks: [passive.hover_pose, passive.jaw_hold, vision.cable_tag]
+  decide:
+    kind: rule
+    accept_all: [{feature: passive.hover_pose/port_match, above: 0.5}, {feature: passive.hover_pose/in_band, above: 0.5},
+                 {feature: passive.jaw_hold/in_band, above: 0.5}]
+    reject_any: [{feature: passive.hover_pose/port_match, below: 0.5}, {feature: passive.hover_pose/lateral_mm, above: 6.0},
+                 {feature: passive.jaw_hold/closed_empty, above: 0.5}, {feature: vision.cable_tag/mismatch, above: 0.5}]
+released_stable:
+  done_means: The gripper has let go of the cable and its plug has stayed seated in its assigned port.
+  checks: [passive.jaw_hold, passive.release_record, vision.gap@now]
+  decide:
+    kind: rule
+    accept_all: [{feature: passive.jaw_hold/open, above: 0.5}]
+    reject_any: [{feature: passive.jaw_hold/open, below: 0.5}, {feature: passive.release_record/lifted_closed, above: 0.5},
+                 {feature: vision.gap@now/gap_mm_est, above: 2.0}]
+""")
+
+
 def _rules_in_the_task_files() -> list[tuple[str, str, dict]]:
     found = []
     for path in sorted((REPO_ROOT / "tasks").glob("*.yaml")):
         for name, spec in yaml.safe_load(path.read_text(encoding="utf-8"))["predicates"].items():
             if spec["decide"]["kind"] == "rule":
                 found.append((path.stem, name, spec))
+    found += [("cable_loop_until_s5c", name, spec) for name, spec in CABLE_RULES_UNTIL_S5C.items()]
     return found
 
 
 def test_the_task_files_hold_rules():
     assert len(_rules_in_the_task_files()) >= 1
+
+
+def test_the_cable_loops_hand_set_rules_are_gone_from_its_task_file():
+    """S5c fix: after E3 every hand-set check of the cable loop became a calibrated witness."""
+    predicates = _task("cable_loop")["predicates"]
+    assert all(spec["decide"]["kind"] == "witness" for spec in predicates.values())
+    assert "passive.release_lift" in predicates["released_stable"]["checks"]
 
 
 @pytest.mark.parametrize("task, name, spec", _rules_in_the_task_files(), ids=lambda v: v if isinstance(v, str) else "")
@@ -210,7 +248,7 @@ def test_each_task_file_rule_accepts_rejects_and_abstains_as_written(source, tas
 
 
 def test_every_rule_in_the_cable_task_file_builds():
-    predicates = _task("cable_loop")["predicates"]
+    predicates = {**_task("cable_loop")["predicates"], **CABLE_RULES_UNTIL_S5C}
     rules = {name: spec for name, spec in predicates.items() if spec["decide"]["kind"] == "rule"}
     assert rules
     for name, spec in rules.items():
@@ -220,7 +258,7 @@ def test_every_rule_in_the_cable_task_file_builds():
         assert RuleWitness(name, spec, "rule-v1").checks == witness.checks          # the whole entry works too
         again = RuleWitness.from_dict(witness.to_dict())
         assert again.to_dict() == witness.to_dict()
-    for name, spec in predicates.items():
+    for name, spec in _task("cable_loop")["predicates"].items():
         if spec["decide"]["kind"] == "witness":
             with pytest.raises(ValueError, match="A cascade comes from the witness store"):
                 RuleWitness(name, spec["decide"], "rule-v1")
@@ -246,7 +284,8 @@ def test_a_pydantic_spec_reads_like_a_dict():
 
 def test_the_task_specs_of_avail_core_build_rule_witnesses():
     task_module = pytest.importorskip("avail.core.task")
-    task = task_module.load_task("cable_loop")
+    task = task_module.TaskSpec.model_validate({**_task("cable_loop"), "predicates": {
+        **_task("cable_loop")["predicates"], **CABLE_RULES_UNTIL_S5C}})       # the task as it ran through E3
     built = 0
     for name, predicate in task.predicates.items():
         if predicate.decide.kind == "rule":

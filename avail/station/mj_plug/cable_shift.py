@@ -24,6 +24,24 @@ from ...paths import data_root
 from .cable_cell import CableCell
 
 E3_WITNESS_DIR = "witness_e3"
+WITNESS_ROOT_ENV = "AVAIL_WITNESS_ROOT"         # 2026-11-16 (docs/07, step 5): a flywheel day's own witness folder
+
+
+def witness_root(create: bool = False):
+    """Where the cable loop's witnesses are read from: AVAIL_DATA/witness_e3, or the folder ``AVAIL_WITNESS_ROOT`` names
+    for a dev run of the flywheel. A final run refuses the override, and nothing is ever built under it."""
+    import os
+    from pathlib import Path
+
+    from ...seeds import FINAL_RUN_ENV
+
+    override = os.environ.get(WITNESS_ROOT_ENV, "").strip()
+    if override:
+        if os.environ.get(FINAL_RUN_ENV):
+            raise RuntimeError(f"{WITNESS_ROOT_ENV} is set inside the final run {os.environ[FINAL_RUN_ENV]}. A final run "
+                               f"reads AVAIL_DATA/{E3_WITNESS_DIR} alone")
+        return Path(override)
+    return data_root(create=create) / E3_WITNESS_DIR
 
 
 def cable_stages():
@@ -88,12 +106,12 @@ def setup_files() -> list:
     from .cable_teach import PALETTE_FILE
 
     files = [CELL_YAML, PALETTE_FILE, REPO_ROOT / "config" / "models.yaml"]
-    root = data_root() / E3_WITNESS_DIR
+    root = witness_root()
     for variant in load_experiment().e3.get("variants", []):
-        predicate = primary_predicate(variant)
-        have = store.versions(variant, predicate, root=root) if (root / variant / predicate).is_dir() else []
-        if have:
-            files.append(store.witness_dir(variant, predicate, root) / f"v{max(have)}.json")
+        for predicate in (primary_predicate(variant), *CHECKED):       # the insertion's and the S5c fix's witnesses
+            have = store.versions(variant, predicate, root=root) if (root / variant / predicate).is_dir() else []
+            if have:
+                files.append(store.witness_dir(variant, predicate, root) / f"v{max(have)}.json")
     files += [path for path in judge_reference_files().values() if path.is_file()]
     return files + station_files()
 
@@ -122,7 +140,7 @@ def prepare_problem(variants, alpha: float) -> str | None:
     from ...analysis.run import primary_predicate
     from ...witness import store
 
-    root = data_root() / E3_WITNESS_DIR
+    root = witness_root()
     references = judge_reference_files()
     found = []
     for variant in variants:
@@ -139,6 +157,13 @@ def prepare_problem(variants, alpha: float) -> str | None:
         path = references.get(variant)
         if path is not None and not path.is_file():
             found.append(f"{variant} has no judge reference picture ({path})")
+        for checked in CHECKED:                        # S5c fix: the witnesses that replaced the hand-set rules
+            have = store.versions(variant, checked, root=root) if (root / variant / checked).is_dir() else []
+            if not have:
+                found.append(f"{variant} has no calibrated {checked} witness under {root}")
+            elif not _check_matches(store.load(variant, checked, root=root)[0], checked, alpha):
+                found.append(f"the latest {variant} {checked} witness (v{max(have)}) was built for another alpha, other "
+                             f"stages or another calibration split (alpha {alpha}, split {CHECK_CALIBRATION_SPLIT})")
     return ". ".join(found) if found else None
 
 
@@ -167,7 +192,7 @@ def e3_cascade(variant: str, alpha: float):
     from ...zoo.stages import SKIP_FEATURES, STATION_ID
 
     predicate = primary_predicate(variant)
-    root = data_root(create=True) / E3_WITNESS_DIR
+    root = witness_root(create=True)
     stages = cable_stages()
     names = [d.name for d in stages]
     try:
@@ -181,7 +206,7 @@ def e3_cascade(variant: str, alpha: float):
 
     from ...seeds import FINAL_RUN_ENV
 
-    if os.environ.get(FINAL_RUN_ENV):                 # a final run reads its witness and never fits or publishes one
+    if os.environ.get(FINAL_RUN_ENV) or os.environ.get(WITNESS_ROOT_ENV):   # a final run and a flywheel day only read
         raise RuntimeError(f"no {E3_WITNESS_DIR} witness for {variant} {predicate} at alpha {alpha} with stages {names}, "
                            f"and a final run is open. Run `avail shift prepare --variant {variant}` before the final run")
     beta = load_experiment().bounds.beta
@@ -208,13 +233,136 @@ def cable_table(variant: str, split: str):
     return table
 
 
+# ----------------------------------------------------------------------------- the checks that were hand-set (S5c fix)
+CHECK_FIT_SPLIT, CHECK_CALIBRATION_SPLIT = "check_fit", "check_calibration"
+
+
+def check_stages(predicate: str):
+    """The stages of the calibrated witness for ``held``, ``at_port`` or ``released_stable``. ``at_port`` also reads the
+    hover pose against the board's offset as the robot measured it (``passive.hover_offset``). ``released_stable``:
+    the jaws, the release record and the lift's forces, then the camera after the retreat, then a closer look from an
+    inspection pose by the port (``vision.release_relook``, the only source here that moves the arm, touching nothing)."""
+    from ...witness.cascade import StageDef
+
+    if predicate == "held":
+        return (StageDef("passive", ("passive.jaw_hold", "vision.cable_tag"), "A", "y0"),)
+    if predicate == "at_port":
+        return (StageDef("passive", ("passive.hover_pose", "passive.hover_offset", "passive.jaw_hold", "vision.cable_tag"),
+                         "A", "y0"),)
+    if predicate == "released_stable":
+        # 2026-11-14, fix 2: the passive signals and the camera at the end of the lift, then the re-grip pull. The relook
+        # (2026-11-13) left the witness: it moved the arm before the pull and barely changed what the camera read
+        return (StageDef("passive", ("passive.jaw_hold", "passive.release_record", "passive.release_lift", "vision.gap@now"),
+                         "A", "y0"),
+                StageDef("tug", ("probe.release_tug",), "B", "B/probe.release_tug/_y"))
+    raise KeyError(f"no calibrated check for {predicate!r}")
+
+
+CHECKED = ("held", "at_port", "released_stable")
+
+
+def check_settings() -> dict:
+    """The check witnesses' alphas, crossing rule and design date from config (`check_witness`, docs/07 2026-11-16).
+    Empty when the config names none, and then each witness is built as E3b's were."""
+    return dict(load_experiment().check_witness or {})
+
+
+def check_alpha(predicate: str, alpha: float) -> float:
+    """A check witness's alpha: its own from config when it has one, else the customer bar's."""
+    return float(dict(check_settings().get("alphas", {})).get(predicate, alpha))
+
+
+def _check_matches(cascade, predicate: str, alpha: float) -> bool:
+    s = check_settings()
+    return (abs(float(cascade.alpha) - float(check_alpha(predicate, alpha))) < 1e-12
+            and [d.name for d in cascade.stage_defs] == [d.name for d in check_stages(predicate)]
+            and [list(d.sources) for d in cascade.stage_defs] == [list(d.sources) for d in check_stages(predicate)]
+            and dict(cascade.calibration or {}).get("split_id") == CHECK_CALIBRATION_SPLIT
+            and getattr(cascade, "crossing", "abstain") == s.get("crossing", "abstain")
+            and dict(cascade.calibration or {}).get("design") == s.get("design"))
+
+
+#: the enrichment of released_stable (docs/07, 2026-11-13): the release's own failure injected on its own seed ranges,
+#: joined to the natural rows of its table. E3b's seeds are never enriched
+ENRICHED = {("released_stable", CHECK_FIT_SPLIT): "check_fit_drag",
+            ("released_stable", CHECK_CALIBRATION_SPLIT): "check_calibration_drag"}
+
+
+def check_table(variant: str, split: str, predicate: str):
+    """The claims of 1 predicate in a check split (``check_zoo.py``), checked to hold only that split's seeds, with
+    the predicate's enrichment rows when it has them."""
+    import pandas as pd
+
+    from ...zoo import store
+
+    parts = []
+    for name in (split, ENRICHED.get((predicate, split))):
+        if name is None:
+            continue
+        table = store.load(variant, name, "features")
+        store.check_seeds_in_split(table["seed"], name)
+        parts.append(table[table["claim_predicate"] == predicate])
+    out = pd.concat(parts, ignore_index=True)
+    if predicate == "released_stable":
+        # 2026-11-16 (docs/07, step 1): the pull's held_at_cap and force_frac, functions of what the pull stored
+        from ...evidence.release_tug import derive
+
+        out = derive(out, variant)
+    return out
+
+
+@lru_cache(maxsize=8)
+def check_cascade(variant: str, predicate: str, alpha: float):
+    """The calibrated witness for a hand-set predicate, at the customer bar's alpha. Built once, then read."""
+    import os
+
+    from ...seeds import FINAL_RUN_ENV
+    from ...witness import store
+    from ...witness.cascade import Cascade, calibrate_cascade, fit_scorers
+    from ...zoo.stages import SKIP_FEATURES, STATION_ID
+
+    root = witness_root(create=True)
+    stages = check_stages(predicate)
+    settings = check_settings()
+    alpha = check_alpha(predicate, alpha)
+    try:
+        _, payload = store.load(variant, predicate, root=root)
+        cascade = Cascade.from_dict(payload["cascade"])
+        if _check_matches(cascade, predicate, alpha):
+            return cascade
+    except FileNotFoundError:
+        pass
+    if os.environ.get(FINAL_RUN_ENV) or os.environ.get(WITNESS_ROOT_ENV):   # a final run and a flywheel day only read
+        raise RuntimeError(f"no calibrated {predicate} witness for {variant} at alpha {alpha}, and a final run is open. "
+                           f"Run `avail shift prepare --variant {variant}` before the final run")
+    beta = load_experiment().bounds.beta
+    fit = check_table(variant, CHECK_FIT_SPLIT, predicate)
+    cal = check_table(variant, CHECK_CALIBRATION_SPLIT, predicate)
+    scorers, neg_share, pos_share = fit_scorers(fit, variant, predicate, stages, SKIP_FEATURES)
+    cascade = calibrate_cascade(scorers, neg_share, pos_share, cal, variant, predicate, alpha, beta, stages,
+                                station_id=STATION_ID, skip_features=SKIP_FEATURES, split_id=CHECK_CALIBRATION_SPLIT,
+                                crossing=str(settings.get("crossing", "abstain")))
+    if settings.get("design"):
+        cascade.calibration["design"] = settings["design"]
+    provenance = {"purpose": f"S5c fix: {predicate} calibrated in place of the hand-set rule, after E3. "
+                             f"Design {settings.get('design', 'S5c')}: alpha from the error budget, crossing "
+                             f"{settings.get('crossing', 'abstain')}", "alpha": alpha,
+                  "beta": beta, "stages": [d.name for d in stages],
+                  "fit": f"{CHECK_FIT_SPLIT} ({len(fit)} claims, {int((~fit['y0'].astype(bool)).sum())} bad)",
+                  "calibration": f"{CHECK_CALIBRATION_SPLIT} ({len(cal)} claims, {int((~cal['y0'].astype(bool)).sum())} bad)"}
+    _, cascade = store.publish(cascade, checks={}, provenance=provenance, root=root)
+    return cascade
+
+
 def make_witnesses(task, variant: str, alpha: float) -> dict:
     from ...witness.rules import RuleWitness
 
     out = {}
     for step, predicate in task.required(variant):
         spec = task.predicates[predicate]
-        if spec.decide.kind == "witness":
+        if spec.decide.kind == "witness" and predicate in CHECKED:
+            out[predicate] = check_cascade(variant, predicate, float(alpha))
+        elif spec.decide.kind == "witness":
             out[predicate] = e3_cascade(variant, float(alpha))
         else:
             out[predicate] = RuleWitness.from_predicate(spec, version=f"{task.task}-rules")
@@ -222,8 +370,20 @@ def make_witnesses(task, variant: str, alpha: float) -> dict:
 
 
 def make_human(cell: CableCell, seed: int):
+    """The simulated operator. A dev run can ask for one who is not perfect (docs/07, 2026-11-16, step 4) through
+    ``AVAIL_SIMOP_OPERATOR``. A final run refuses that."""
+    import os
+
+    from ...seeds import FINAL_RUN_ENV
+    from .imperfect_operator import ENV, ImperfectHuman, from_env
     from .oracle_human import OracleHuman
 
+    spec = from_env()
+    if spec is not None:
+        if os.environ.get(FINAL_RUN_ENV):
+            raise RuntimeError(f"{ENV} is set inside the final run {os.environ[FINAL_RUN_ENV]}: a final run's operator is "
+                               "the configured one")
+        return ImperfectHuman(cell, seed, *spec)
     return OracleHuman(cell, seed)
 
 
@@ -425,7 +585,7 @@ def tool_session(task_name: str, variant: str, seeds: list[int], *, shift: str, 
         cell = make_cell(seed, variant)
         try:
             with LedgerWriter(run_id, folder=run_dir) as ledger:
-                core = ToolCore(task, cell, "avail_human", witnesses=make_witnesses(task, variant, alpha),
+                core = ToolCore(task, cell, "avail_simop", witnesses=make_witnesses(task, variant, alpha),
                                 human=make_human(cell, seed), ledger=ledger, run_id=run_id, cycle_id=f"{run_id}",
                                 evaluator=evaluator(cell))
                 server = ToolServer(ToolCell(cell, core), core, log=ledger.append)
@@ -437,7 +597,7 @@ def tool_session(task_name: str, variant: str, seeds: list[int], *, shift: str, 
                     it.declared_done = bool(ok)
                     # the 1st step the gate still holds open, as the driver records it, so the card counts it
                     it.unresolved = None if ok else steps_of.get(open_predicates[0], open_predicates[0])
-                _cycle_end(ledger, core, core.log, evaluate(cell), seed, "avail_human_tools", variant, task)
+                _cycle_end(ledger, core, core.log, evaluate(cell), seed, "avail_simop_tools", variant, task)
             frames = frames_table(cell)
             (run_dir / "frames").mkdir(parents=True, exist_ok=True)
             frames.to_parquet(run_dir / "frames" / f"{run_id}.parquet", index=False)

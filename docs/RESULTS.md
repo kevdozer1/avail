@@ -1,7 +1,9 @@
 # Results
 
 Level 1: in simulation, a skill's own done flag passes about 80% of bad plugs, a tug passes about 2%, a cheap VLM
-judge 18% to 32%, and AVAIL's calibrated cascade under 1%, asking a person about 3% of the time.
+judge 18% to 32%, and AVAIL's calibrated cascade under 1%, asking a person about 3% of the time. On a 5-cable loop with
+a simulated operator, AVAIL shipped a bad cable in 31 of 5,000 cycles in E3 and, after its checks were fixed, in 2 of
+5,000 in E3b, at 223.6 calls for help per 100 cycles.
 
 Every number on this page is simulation, from the plug and cable station in `avail/station/mj_plug`, scored against
 truth the checks never read. Test seeds were read once. Rates carry a Wilson 95% interval, and bounds are one-sided
@@ -57,16 +59,18 @@ Luna's low rate comes from saying no to almost every plug, good ones too.
 
 ## The cable loop (sim)
 
-A cycle picks 5 cables from a rack and plugs each into its assigned `latch` port. Arms: `flag` trusts each skill's
-own done, `avail` gates each step and never asks, `avail_human` gates each step and asks a simulated person when it
-cannot tell. The simulated person answers from truth and takes over with a scripted correction.
+A cycle picks 5 cables from a rack and plugs each into its assigned `latch` port. Arms: `flag` (`skill_done` in E3b)
+trusts each skill's own done, `avail` gates each step and never asks, `avail_simop` gates each step and asks a
+simulated operator when it cannot tell. E3 recorded that arm under its old name, `avail_human`. The simulated operator
+answers from truth and takes over with a scripted correction. A cycle ships a bad cable when it ends declared done
+while a cable is not seated, latched and let go in its assigned port.
 
 ### E3: the certification run (sim, `latch`, test seeds read once)
 
 The bar, written before the run: certify under 0.5% of cycles with a bad cable declared done, at 95%. With 5,000
 cycles that allows at most 16.
 
-| Sim, E3 | `flag` | `avail` | `avail_human` |
+| Sim, E3 | `flag` | `avail` | `avail_simop`, recorded as `avail_human` |
 |---|---|---|---|
 | Cycles | 1,000 | 1,000 | 5,000 |
 | Cycles with a bad cable declared done | 67.3% (673, 64.3 to 70.1) | 0.6% (6, 0.3 to 1.3) | 0.62% (31, 0.44 to 0.88), bound 0.84% |
@@ -74,9 +78,39 @@ cycles that allows at most 16.
 | Calls for help per 100 cycles | 0 | 0 | 118.7 |
 | Seconds per cycle | 87 | 91 (1.05x) | 157 (1.81x) |
 
-`avail_human` missed the bar: 31 against at most 16. All 37 bad cables on the 2 AVAIL arms passed at the release
+The operator arm missed the bar: 31 against at most 16. All 37 bad cables on the 2 AVAIL arms passed at the release
 step, through a hand-set rule with no calibrated bound. The calibrated insertion check let no bad insertion through in
-6,000 cycles. A calibrated check for the release is the next piece of work.
+6,000 cycles. E3b below is the 1 retest, after the release check and the other 2 hand-set checks were calibrated.
+
+### E3b: the retest (sim, `latch`, new test seeds read once)
+
+After E3 and before any E3b seed was read, the 3 hand-set checks became witnesses calibrated the way the insertion's
+is, fit on `check_fit` and calibrated on `check_calibration` (`avail/station/mj_plug/check_zoo.py`). `at_port` also
+reads the board's offset as the robot measured it (`passive.hover_offset`). `released_stable` reads the jaws, the
+release record, the lift's forces and the camera, then ends with a pull (`probe.release_tug`): the jaws close on the
+released plug again and pull it below the latch's hold, which a latched plug holds. On calibration (in sample, alpha
+0.01) `held`, `at_port` and `released_stable` sent 5.0%, 5.3% and 3.6% of good claims to the operator. Without the
+pull the release check had sent 94.5%. The bar stayed the same: at most 16 of 5,000 cycles.
+
+| Sim, E3b, 2026-11-14 | `skill_done` | `avail_simop` |
+|---|---|---|
+| Cycles | 1,000 | 5,000 |
+| Cycles with a bad cable shipped | 66.2% (662, 63.2 to 69.1) | 0.04% (2, 0.01 to 0.15), bound 0.13% |
+| Calls for help per 100 cycles | 0 | 223.6 |
+| Seconds per cycle | 87 | 219 (2.53x) |
+
+`avail_simop` met the bar: 2 against at most 16. Both bad cables passed the release check after an insertion that let
+go early. The cost was description only, as written before the run: 223.6 calls for help per 100 cycles (E3: 118.7),
+219 s per cycle (E3: 157 s) and 2.2 robots per operator (E3: 2.7), where robots per operator is the cycle time over
+the operator's answering and handling time per cycle. The pull adds 18.4 s of checks per cycle. The carry made 54% of
+the calls: a cable cocked in the jaws stays cocked when the carry is tried again. The 2 runs are not 2 tests of 1
+system. E3b's checks were changed after E3 failed, and it ran on new seeds. E3's failure stays on record.
+
+![Calls for help per 100 cycles against cycles with a bad cable shipped, for the skills alone, E3 and E3b](img/frontier.png)
+
+E3 and E3b ran before the recovery ladder that is in the code now (`fork.ladder` in `tasks/cable_loop.yaml`). In both,
+a rejected step was retried once, and an uncertain step or a 2nd reject went to the operator. The ladder has no
+test-seed result.
 
 ### The figure run (sim, `latch`, 100 new test seeds read once)
 
@@ -86,7 +120,7 @@ step, through a hand-set rule with no calibrated bound. The calibrated insertion
 work by looking: after every step a VLM judge (GPT-6 Luna, the cropped view after a seated reference, the robot's
 readings in the prompt, reasoning off) sees the step's frames, and its yes or no decides, with 2 tries.
 
-| Sim, figure run | Skill says done | Agent looks at the camera | AVAIL | AVAIL + a person |
+| Sim, figure run | Skill says done | Agent looks at the camera | AVAIL | AVAIL + simulated operator |
 |---|---|---|---|---|
 | Every cable truly done | 31 | 0 | 43 | 97 |
 | Declared done with a bad cable | 64 (54.2 to 72.7) | 0 | 0 (bound 3.0%) | 0 (bound 3.0%) |

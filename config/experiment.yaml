@@ -23,6 +23,11 @@ seeds:
   cable_fit: [24000, 25999]             # S5b: the cable loop's own insertions, to fit E3's insertion witness. Added 2026-11-12
   cable_calibration: [26000, 27999]     # S5b: and to calibrate it. Neither range is a test range
   fig_test: [72000, 72099]              # S5c: the README figure's run. Read once, by the final run FIG. Added 2026-11-13
+  check_fit: [28000, 28999]             # S5c fix: the cable loop's hand-set checks (released_stable, held, at_port), fit. Added 2026-11-13
+  check_calibration: [29000, 29999]     # S5c fix: and their calibration. Neither range is a test range
+  shift_test_e3b: [80000, 84999]        # E3b, the 1 retest of the defect bar (H3b). Read once, by the final run E3b
+  check_fit_drag: [85000, 85499]        # S5c enrichment: released_stable's tip-and-drag failure, fit. Not a test range
+  check_calibration_drag: [85500, 85999] # S5c enrichment: the same, calibration (docs/07, 2026-11-13)
 
 customer_bar:                     # from the CoRL 2026 keynote slide "The customer sets the requirements"
   uptime: 0.985
@@ -155,12 +160,43 @@ e3:
   vlm_judge: {model: fable, prompt: crop_ref}   # the vlm arm's judge: Fable 5.2 on the crop with a seated reference, chosen before the S4c judge numbers. A change here needs a new vlm_usd_per_cycle
   vlm_usd_per_cycle: 0.21     # measured 2026-11-12: the 40 vlm cycles of the dev shift dev1 cost $8.16 at full price ($7.95 paid, 8 of 303 calls came from the cache), $0.204 per cycle. The E3 run refuses to start a vlm arm its cap cannot cover
 
+# E4, Kevin's brief of 2026-11-16, written before any code of that night changed and before any E4 seed was read
+# (docs/07, the note of 2026-11-16). E3b showed the defect bar can hold. E4 asks whether it holds at a cost a
+# deployment would accept, so H4a and H4b must both pass. Arms share seeds from shift_test_e4's start (40,000).
+# skill_done is each step's own flag (the driver's flag arm), on the 1st 1,000 seeds. Robots per operator and cycle
+# time are description only. E3 and E3b stay on record as they are. The E4 planned on 2026-11-11 (20 shifts of 200
+# cycles, a drift injected after shift 10) never ran and nothing reads its values. They are kept here as comments:
+#   shifts: 20, cycles_per_shift: 200, initial_calibration_states: 400, injection_after_shift: 10,
+#   injection: {camera_xyz_mm: 8, camera_rot_deg: 4, fric_retention_scale: 0.7}
 e4:
-  shifts: 20
-  cycles_per_shift: 200
-  initial_calibration_states: 400
-  injection_after_shift: 10
-  injection: {camera_xyz_mm: 8, camera_rot_deg: 4, fric_retention_scale: 0.7}
+  variant: latch
+  arms: {skill_done: 1000, avail_simop: 5000}
+  driver_arms: {skill_done: flag, avail_simop: avail_simop}
+  # H4a: cycles with a bad cable shipped, one-sided 95% Clopper-Pearson upper bound at most 0.5%: 16 of 5,000 or fewer
+  h4a: {arm: avail_simop, max_bad_cycles: 16, cycles: 5000, bar: 0.005, confidence: 0.95, bound: clopper_pearson_one_sided}
+  # H4b: calls for help per 100 cycles (the shift card's assists), one-sided 95% upper bound from a per-cycle bootstrap
+  # at most 112, half of E3b's 224. The bound: the 5,000 per-cycle counts resampled with replacement 10,000 times by
+  # numpy's default_rng(40000), the 95th percentile of the resampled means, times 100
+  h4b: {arm: avail_simop, max_calls_per_100: 112, confidence: 0.95, bound: bootstrap_percentile_one_sided,
+        resamples: 10000, rng_seed: 40000, unit: cycle}
+  description_only: [robots_per_operator, cycle_s, line_speed_vs_skill_done, takeovers_per_100]
+  # the gate before E4, on dev seeds with the night's steps 1 to 3 combined. All 3 must pass, then a frozen worktree
+  # tagged e4-freeze, a dev shift of 100 cycles per arm on fresh dev seeds (harness health only), then E4 --plan and
+  # the run from that worktree. A failed gate leaves E4 unstarted and its seeds unread
+  gate: {cycles: 500, max_calls_per_100: 100, max_bad_cycles: 1, max_good_to_operator: 0.20}
+  dev_shift_cycles: 100
+
+# The calibrated check witnesses of the cable loop after the night of 2026-11-16 (docs/07, steps 1 and 3), chosen on
+# calibration only. The error budget: the union bound on bad cables shipped per cycle is 0.338 x alpha(released_stable)
+# + 0.175 x alpha(held) = 0.477%, under the 0.5% bar. at_port has no share: a cable it wrongly passes still meets the
+# insertion and release checks, which see every way it can be bad. Its alpha is the one with the fewest abstains plus
+# bad claims passed on in calibration. crossing: accept above the accept threshold where a stage's 2 thresholds cross.
+# The insertion witness (v3) keeps alpha 0.01 and its rule. The bound covers claims drawn like the calibration claims:
+# a release claim after a false accept upstream, a wrong answer or a rung is outside it (review, 2026-11-16)
+check_witness:
+  alphas: {held: 0.006, at_port: 0.025, released_stable: 0.011}
+  crossing: accept
+  design: "2026-11-16"
 
 e7:                                                         # stretch, after v0.1. See docs/07_experiments.md
   initial_demos: [50, 200, 1000]
@@ -191,6 +227,13 @@ spend_caps_usd:
 # step's camera frames and the robot's readings, and its yes or no decides. The judge is the non-Fable judge with the
 # best balanced accuracy in S4c, since none passed 80% of good plugs: on latch crop_ref, Luna (1 - 1.0% + 0 of 48) / 2
 # = 0.495 and Nex N2.5 mini (1 - 26.0% + 11 or 12 of 48) / 2 = 0.485 to 0.495. Reasoning is off for judge calls.
+# E3b, the 1 retest of the defect bar (H3b in docs/07, 2026-11-13). Arms share seeds from shift_test_e3b's start.
+# skill_done is each step's own flag (the driver's flag arm), on the 1st 1,000 seeds, for the figure.
+e3b:
+  variant: latch
+  arms: {skill_done: 1000, avail_simop: 5000}
+  driver_arms: {skill_done: flag, avail_simop: avail_simop}
+
 fig:
   variant: latch
   cycles: 100

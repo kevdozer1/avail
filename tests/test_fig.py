@@ -124,8 +124,8 @@ def test_only_fig_reads_the_figure_seeds(tmp_path):
         guard([72000], purpose="test", final_run="E3", record_path=record)
     with pytest.raises(TestSeedError):
         guard([72000], purpose="test", record_path=record)
-    guard([72000, 72099], purpose="test", final_run="FIG", record_path=record)
-    assert '"split": "fig_test"' in record.read_text(encoding="utf-8")
+    with pytest.raises(TestSeedError, match="retired"):            # FIG read its seeds on 2026-11-13
+        guard([72000, 72099], purpose="test", final_run="FIG", record_path=record)
 
 
 def test_run_refuses_the_fig_final_run():

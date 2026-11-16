@@ -78,7 +78,7 @@ def person(confirm=None, choose=None):
 def run(decisions, human):
     events = []
     ledger = SimpleNamespace(append=lambda kind, payload: events.append((kind, payload)))
-    driver = CycleDriver(TASK, Cell(), "avail_human", witnesses={"placed": Witness(decisions)}, human=human,
+    driver = CycleDriver(TASK, Cell(), "avail_simop", witnesses={"placed": Witness(decisions)}, human=human,
                          ledger=ledger)
     log = driver.run()
     return log, [p for k, p in events if k == "intervention"], [p for k, p in events if k == "assist"]

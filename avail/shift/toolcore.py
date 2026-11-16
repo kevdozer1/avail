@@ -19,7 +19,7 @@ from .driver import CycleDriver, ItemLog
 class ToolCore(CycleDriver):
     """1 cycle's AVAIL tools. ``steps``, ``probes`` and ``describe()`` feed the server's schemas and graph."""
 
-    def __init__(self, task, cell, arm: str = "avail_human", **kwargs):
+    def __init__(self, task, cell, arm: str = "avail_simop", **kwargs):
         super().__init__(task, cell, arm, **kwargs)
         self.steps = [s.name for s in task.steps]
         self.probes = list(getattr(cell, "probes", []))          # the cell names the probes it can run

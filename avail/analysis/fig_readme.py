@@ -23,9 +23,11 @@ from pathlib import Path
 import numpy as np
 
 ARMS = (("skill_done", "flag", "Skill says done"), ("agent_looks", "agent_looks", "Agent looks at the camera"),
-        ("avail", "avail", "AVAIL"), ("avail_human", "avail_human", "AVAIL + a person"))
+        ("avail", "avail", "AVAIL"), ("avail_simop", "avail_simop", "AVAIL + simulated operator"))
+LEGACY = {"avail_simop": ("avail_human",)}        # E3's and FIG's recorded name for avail_simop (renamed 2026-11-13)
 GREEN, RED, GREY, INK, MUTED = "#2e9e5b", "#d64545", "#c9ccd1", "#1f2328", "#5b6270"
-CAPTION = "Simulation, 5-cable loop, latch connector."
+CAPTION = ("Simulation, 5-cable loop, latch connector.\nThe simulated operator answers from simulator truth "
+           "and takes over with a scripted correction.")
 
 
 # ----------------------------------------------------------------------------- ledgers
@@ -41,10 +43,11 @@ def _events(shift_dir: Path, arm: str, kinds: tuple[str, ...]):
 def cycles(shift_dir: Path, arm: str) -> list[dict]:
     """The arm's ended cycles, 1 per seed (the last when a seed reran), in seed order."""
     by_seed = {}
-    for run, e in _events(shift_dir, arm, ("cycle_end",)):
-        p = e["payload"]
-        if p.get("arm") == arm:
-            by_seed[int(p["seed"])] = {**p, "_run": str(run)}
+    for name in (arm, *LEGACY.get(arm, ())):
+        for run, e in _events(shift_dir, name, ("cycle_end",)):
+            p = e["payload"]
+            if p.get("arm") == name:
+                by_seed[int(p["seed"])] = {**p, "_run": str(run)}
     return [by_seed[s] for s in sorted(by_seed)]
 
 
@@ -221,7 +224,7 @@ def draw(summary: dict, wrist: np.ndarray | None, ex: dict | None, out: Path) ->
     for k, name in enumerate(arms):
         s = summary[name]
         left = 0.06 + k * (width + 0.025)
-        ax = fig.add_axes([left, 0.12, width, 0.30])
+        ax = fig.add_axes([left, 0.155, width, 0.275])
         colors = {"green": GREEN, "red": RED, "grey": GREY}
         for i, kind in enumerate(s["outcomes"][:100]):
             r, c = divmod(i, 10)
@@ -230,15 +233,15 @@ def draw(summary: dict, wrist: np.ndarray | None, ex: dict | None, out: Path) ->
         ax.set_ylim(-0.1, 10)
         ax.set_aspect("equal")
         ax.set_axis_off()
-        ax.set_title(s["title"], fontsize=12, color=INK, pad=6)
+        ax.set_title(s["title"], fontsize=11, color=INK, pad=6)
         n = "" if s["n"] == 100 else f", n = {s['n']}"
-        fig.text(left + width / 2, 0.085, f"{s['time_x']:.2f}x time{n}", ha="center", fontsize=11, color=INK)
-        fig.text(left + width / 2, 0.055, f"{s['assists_per_100']:.0f} calls for help / 100", ha="center",
+        fig.text(left + width / 2, 0.118, f"{s['time_x']:.2f}x time{n}", ha="center", fontsize=11, color=INK)
+        fig.text(left + width / 2, 0.088, f"{s['assists_per_100']:.0f} calls for help / 100", ha="center",
                  fontsize=11, color=MUTED)
-    fig.text(0.06, 0.455, "■ every cable done", color=GREEN, fontsize=11)
-    fig.text(0.24, 0.455, "■ declared done with a bad cable", color=RED, fontsize=11)
-    fig.text(0.52, 0.455, "■ held back", color="#8a8f98", fontsize=11)
-    fig.text(0.06, 0.015, CAPTION, fontsize=10, color=MUTED)
+    fig.text(0.06, 0.488, "■ every cable done", color=GREEN, fontsize=11)
+    fig.text(0.24, 0.488, "■ declared done with a bad cable", color=RED, fontsize=11)
+    fig.text(0.52, 0.488, "■ held back", color="#8a8f98", fontsize=11)
+    fig.text(0.06, 0.008, CAPTION, fontsize=10, color=MUTED, linespacing=1.4)
     paths = []
     for ext in ("svg", "png"):
         p = out.with_suffix(f".{ext}")

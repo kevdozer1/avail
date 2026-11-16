@@ -140,7 +140,7 @@ def test_the_white_cable_in_dim_light_is_still_white(mujoco_ok):
 
 
 def test_a_chosen_takeover_is_1_call_for_help_and_labels_the_state_it_found(latch_witnesses):
-    """Dev seed 20007, latch, avail_human: cable 4's insertion is rejected twice, the person chooses to take over
+    """Dev seed 20007, latch, avail_simop: cable 4's insertion is rejected twice, the person chooses to take over
     and seats it. That is 1 call for help with 1 wait. The takeover's label is what the person found, a plug that
     was not latched, so it agrees with the evidence it is stored with, and the done gate takes their sign-off."""
     from avail.core.task import load_task
@@ -156,26 +156,26 @@ def test_a_chosen_takeover_is_1_call_for_help_and_labels_the_state_it_found(latc
     task = load_task("cable_loop")
     cell = cable_shift.make_cell(20007, "latch")
     try:
-        driver = CycleDriver(task, cell, "avail_human", witnesses=latch_witnesses,
+        driver = CycleDriver(task, cell, "avail_simop", witnesses=latch_witnesses,
                              human=cable_shift.make_human(cell, 20007), ledger=Ledger(),
                              evaluator=cable_shift.evaluator(cell))
         log = driver.run()
         truth = cable_shift.evaluate(cell)
     finally:
         cable_shift.close(cell)
-    ivs = [p for kind, p in events if kind == "intervention"]
-    assert [(iv.item, iv.step, iv.question, iv.outcome) for iv in ivs] == [
-        ("4", "insert", "choose", "unresolved"), ("4", "insert", "takeover", "taken_over_done")]
+    # cable 5's insertion. Since the S5c fix (2026-11-14) the calibrated release witness also calls on other cables
+    ivs = [p for kind, p in events if kind == "intervention" and (p.item, p.step) == ("4", "insert")]
+    assert [(iv.question, iv.outcome) for iv in ivs] == [("choose", "unresolved"), ("takeover", "taken_over_done")]
+    assert ivs[0].seconds_waiting > 0.0                                               # 1 call for help, 1 wait
     assert ivs[1].truth_label is False and ivs[1].seconds_waiting == 0.0
     assert ivs[1].handoff_frame is not None and ivs[1].handback_frame > ivs[1].handoff_frame
-    assert (log.assists, log.takeovers) == (1, 1)
     assert log.items[4].declared_done and truth[4] and all(truth.values())
-    assist = [p for kind, p in events if kind == "assist"][-1]
+    assist = next(p for kind, p in events if kind == "assist" and p.assist_id == ivs[1].assist_id)
     assert assist.question == "takeover" and assist.truth_label is True               # the sign-off after the handback
 
 
 def test_the_person_fixes_a_blocked_latch(latch_witnesses):
-    """Dev seed 20052, latch, avail_human: cable 3's latch is blocked, the insertion is rejected twice, and the person
+    """Dev seed 20052, latch, avail_simop: cable 3's latch is blocked, the insertion is rejected twice, and the person
     takes over. They take the plug out, clear the latch and seat it. On dev1, when the latch was cleared with the
     plug still in, the person could not pull it out and missed the port in 5 of 8 such takeovers."""
     from avail.core.task import load_task
@@ -191,7 +191,7 @@ def test_the_person_fixes_a_blocked_latch(latch_witnesses):
     task = load_task("cable_loop")
     cell = cable_shift.make_cell(20052, "latch")
     try:
-        CycleDriver(task, cell, "avail_human", witnesses=latch_witnesses,
+        CycleDriver(task, cell, "avail_simop", witnesses=latch_witnesses,
                     human=cable_shift.make_human(cell, 20052), ledger=Ledger(), evaluator=cable_shift.evaluator(cell)).run()
         truth = cable_shift.evaluate(cell)
     finally:

@@ -63,7 +63,8 @@ NAME_PATTERN = r"[a-z][a-z0-9_]*"                                        # a tas
 VARIANT_PATTERN = r"[A-Za-z0-9][A-Za-z0-9_.-]*"
 CHECK_PATTERN = r"[a-z][a-z0-9_]*(?:\.[a-z0-9_]+)+(?:@[a-z0-9_]+)?"       # an evidence source id, maybe with @view
 FEATURE_PATTERN = rf"{CHECK_PATTERN}/[A-Za-z0-9_][A-Za-z0-9_.-]*"         # <check>/<feature>, as a rule reads it
-FORK_KEYS = ("max_attempts", "ask")
+FORK_KEYS = ("max_attempts", "ask", "ladder", "ladder_after")
+LADDER_AFTER = ("abstain", "reject")                   # what a predicate's ladder may follow: an abstain, a last reject
 WITNESS_FIELDS = ("variant",)                                           # the fields a witness name may hold
 MIN_DEFINITION_WORDS = 5
 
@@ -318,11 +319,37 @@ class TaskSpec(_Spec):
             if question not in QUESTION_TYPES:
                 problems.append(f"fork.ask.{trigger} is {question!r}, which is not a question.{_did_you_mean(question, QUESTION_TYPES)} "
                                 f"A question is one of {', '.join(QUESTION_TYPES)}")
+        # 2026-11-16 (docs/07, step 2): the escalation ladder, per predicate the cell's recovery actions to try in order
+        # before a call to the operator, each followed by the predicate's own witness on a fresh claim
+        ladder = value.get("ladder", {})
+        if not isinstance(ladder, dict):
+            problems.append("fork.ladder maps a predicate to the rungs to try before a call, for example {at_port: [regrip]}")
+            ladder = {}
+        for predicate, rungs in ladder.items():
+            if not isinstance(predicate, str) or not _NAME.fullmatch(predicate):
+                problems.append(f"fork.ladder has the key {predicate!r}. Name a predicate of the task")
+            if not isinstance(rungs, list) or not all(isinstance(r, str) and _NAME.fullmatch(r) for r in rungs):
+                problems.append(f"fork.ladder.{predicate} is {rungs!r}. Give a list of rung names, for example [regrip]")
+        # what each predicate's ladder follows (default both): a 2nd look at a state no rung changed is an extra chance
+        # for a false accept, so a look from elsewhere runs after an abstain only
+        after = value.get("ladder_after", {})
+        if not isinstance(after, dict):
+            problems.append("fork.ladder_after maps a predicate to what its ladder follows, for example {held: [abstain]}")
+            after = {}
+        for predicate, when in after.items():
+            if predicate not in ladder:
+                problems.append(f"fork.ladder_after names {predicate!r}, which fork.ladder does not")
+            if not isinstance(when, list) or not when or any(w not in LADDER_AFTER for w in when):
+                problems.append(f"fork.ladder_after.{predicate} is {when!r}. Give a list from {', '.join(LADDER_AFTER)}")
         if problems:
             raise ValueError(". ".join(p.rstrip(".") for p in problems))
         out = dict(value)
         if "ask" in out:
             out["ask"] = dict(out["ask"])
+        if "ladder" in out:
+            out["ladder"] = {k: list(v) for k, v in out["ladder"].items()}
+        if "ladder_after" in out:
+            out["ladder_after"] = {k: list(v) for k, v in out["ladder_after"].items()}
         return out
 
     @model_validator(mode="after")
@@ -341,6 +368,10 @@ class TaskSpec(_Spec):
                     on = "" if variant is None else f" on {variant}"
                     problems.append(f"the step {step.name} claims {claim}{on}, which predicates does not define."
                                     f"{_did_you_mean(claim, self.predicates)} Defined: {', '.join(self.predicates)}")
+        for predicate in dict(self.fork.get("ladder", {})):
+            if predicate not in self.predicates:
+                problems.append(f"fork.ladder names {predicate}, which predicates does not define."
+                                f"{_did_you_mean(predicate, self.predicates)} Defined: {', '.join(self.predicates)}")
         if problems:
             raise ValueError(". ".join(p.rstrip(".") for p in problems))
         return self

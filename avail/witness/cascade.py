@@ -127,12 +127,17 @@ class Cascade:
     stage_defs: tuple[StageDef, ...] = field(kw_only=True)
     calibration: dict = field(default_factory=dict, kw_only=True)
     skip_features: tuple[str, ...] = field(default=(), kw_only=True)
+    # what a stage does between its 2 thresholds when they cross (`avail.stats.decide`). A stored witness that
+    # names none was built under the default, `abstain`
+    crossing: str = field(default="abstain", kw_only=True)
 
     def __post_init__(self) -> None:
         if not isinstance(self.station_id, str) or not self.station_id.strip():
             raise ValueError(f"station_id must name the station the cascade is calibrated on, got {self.station_id!r}")
         self.stage_defs = tuple(self.stage_defs)
         self.skip_features = tuple(self.skip_features)
+        if self.crossing not in ("abstain", "accept"):
+            raise ValueError(f"crossing must be 'abstain' or 'accept', got {self.crossing!r}")
         if len(self.stage_defs) != len(self.stages):
             raise ValueError(f"the cascade has {len(self.stages)} fitted stages and {len(self.stage_defs)} stage "
                              "definitions. Pass the stage definitions the stages were fit with")
@@ -155,7 +160,7 @@ class Cascade:
             s = stage.scorer.score(frame)
             seconds[open_rows] += stage_seconds(table, sdef)[open_rows]
             labels = np.asarray(table[sdef.label].fillna(False)).astype(bool)
-            d = np.asarray(decide_many(s, stage.tau_reject, stage.tau_accept), dtype=object)
+            d = np.asarray(decide_many(s, stage.tau_reject, stage.tau_accept, self.crossing), dtype=object)
             score[open_rows] = s[open_rows]
             y_dec[open_rows] = labels[open_rows]           # the truth after the last stage that ran
             decided = open_rows & (d != ABSTAIN)
@@ -187,7 +192,7 @@ class Cascade:
                     if name not in self.skip_features:
                         features[f"{key}/{name}"] = float(value)
             score = stage.scorer.score_one(features)
-            d = decide(score, stage.tau_reject, stage.tau_accept)
+            d = decide(score, stage.tau_reject, stage.tau_accept, self.crossing)
             if d != ABSTAIN:
                 decision, reached = d, k + 1
                 break
@@ -219,7 +224,7 @@ class Cascade:
                 "stages": [s.to_dict() for s in self.stages],
                 "stage_defs": [{"name": d.name, "sources": list(d.sources), "zoo_pass": d.zoo_pass, "label": d.label}
                                for d in self.stage_defs],
-                "skip_features": list(self.skip_features)}
+                "skip_features": list(self.skip_features), "crossing": self.crossing}
 
     @staticmethod
     def from_dict(d: dict) -> "Cascade":
@@ -232,7 +237,8 @@ class Cascade:
         return Cascade(d["predicate"], d["connector"], float(d["alpha"]), float(d["beta"]),
                        [FittedStage.from_dict(s) for s in d["stages"]], d.get("version", "v0"),
                        station_id=str(d.get("station_id") or UNKNOWN_STATION), stage_defs=defs,
-                       calibration=d.get("calibration", {}), skip_features=tuple(d.get("skip_features", ())))
+                       calibration=d.get("calibration", {}), skip_features=tuple(d.get("skip_features", ())),
+                       crossing=str(d.get("crossing", "abstain")))
 
 
 def fit_scorers(fit, connector: str, predicate: str, stage_defs: tuple[StageDef, ...],
@@ -253,7 +259,7 @@ def fit_scorers(fit, connector: str, predicate: str, stage_defs: tuple[StageDef,
 def calibrate_cascade(scorers: list[Scorer], neg_share: list[float], pos_share: list[float], cal, connector: str,
                       predicate: str, alpha: float, beta: float, stage_defs: tuple[StageDef, ...], *, station_id: str,
                       skip_features: tuple[str, ...] = (), version: str = "v0", split_id: str = "zoo_calibration",
-                      budget: str = "weighted") -> Cascade:
+                      budget: str = "weighted", crossing: str = "abstain") -> Cascade:
     """Set every stage's thresholds on calibration rows. Scorers stay as fit.
 
     ``stage_defs`` and ``skip_features`` are the ones the scorers were fit with, and ``station_id``
@@ -286,7 +292,7 @@ def calibrate_cascade(scorers: list[Scorer], neg_share: list[float], pos_share: 
         stages.append(FittedStage(sdef.name, sdef.sources, scorers[k], thr["tau_reject"], thr["tau_accept"],
                                   alpha_k[k], beta_k[k], thr["n_neg"], thr["n_pos"]))
     return Cascade(predicate, connector, alpha, beta, stages, version=version, station_id=station_id,
-                   stage_defs=tuple(stage_defs), skip_features=tuple(skip_features),
+                   stage_defs=tuple(stage_defs), skip_features=tuple(skip_features), crossing=crossing,
                    calibration={"n_pos": n_pos[0], "n_neg": n_neg[0], "split_id": split_id,
                                 "date": date.today().isoformat(), "neg_share_fit": neg_share, "pos_share_fit": pos_share})
 

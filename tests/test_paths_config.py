@@ -86,6 +86,11 @@ def test_seed_ranges_match_docs_07_and_are_disjoint():
         "cable_fit": (24000, 25999),
         "cable_calibration": (26000, 27999),
         "fig_test": (72000, 72099),
+        "check_fit": (28000, 28999),
+        "check_calibration": (29000, 29999),
+        "shift_test_e3b": (80000, 84999),
+        "check_fit_drag": (85000, 85499),
+        "check_calibration_drag": (85500, 85999),
     }
     assert budget.split_of(0) == "dev" and budget.split_of(9999) == "dev"
     assert budget.split_of(16000) == "zoo_test"
@@ -186,7 +191,7 @@ def test_a_test_seed_cannot_be_simulated_outside_its_final_run(monkeypatch):
         seeds.assert_simulable(16000)
     with pytest.raises(seeds.TestSeedError, match="outside every range"):
         seeds.assert_simulable(19000)
-    seeds.unlock_final_run("E3")                            # the wrong experiment opens nothing here
+    seeds.unlock_final_run("E4")                            # the wrong experiment opens nothing here
     with pytest.raises(seeds.TestSeedError):
         seeds.assert_simulable(16000)
     with pytest.raises(seeds.TestSeedError, match="retired"):
@@ -196,10 +201,14 @@ def test_a_test_seed_cannot_be_simulated_outside_its_final_run(monkeypatch):
         seeds.assert_simulable(16000)
     with pytest.raises(seeds.TestSeedError, match="retired"):
         seeds.unlock_final_run("E1bE2b")                    # S4b read 64,000 to 65,999 once
-    seeds.unlock_final_run("E3")
-    seeds.assert_simulable(30000)
+    with pytest.raises(seeds.TestSeedError, match="retired"):
+        seeds.unlock_final_run("E3")                        # E3 read 30,000 to 34,999 once
+    with pytest.raises(seeds.TestSeedError, match="retired"):
+        seeds.unlock_final_run("E3b")                       # and E3b 80,000 to 84,999, on 2026-11-14
+    seeds.unlock_final_run("E4")
+    seeds.assert_simulable(40000)
     with pytest.raises(seeds.TestSeedError):
-        seeds.assert_simulable(16000)                       # E3 opens only the shift test seeds
+        seeds.assert_simulable(30000)                       # E4 opens only its own seeds, never E3's
     with pytest.raises(seeds.TestSeedError):
         seeds.assert_simulable(64000)
     seeds.unlock_final_run(None)

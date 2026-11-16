@@ -3,7 +3,8 @@
     uv run python scripts/setup_aspire.py
 
 AVAIL's plug and cable station loads ASPIRE's dual-YAM station model (MJCF and meshes) from that clone at run time.
-Nothing of ASPIRE is copied into this repo. The clone is gitignored.
+Nothing of ASPIRE is copied into this repo. The clone is gitignored. ``uv run avail demo`` runs this script itself
+before it simulates anything, so on a fresh clone the demo is 1 command.
 """
 
 from __future__ import annotations
@@ -43,9 +44,12 @@ def main() -> int:
     if not env.exists():
         env.write_text((REPO / ".env.example").read_text(encoding="utf-8"), encoding="utf-8")
         print("wrote .env from .env.example", flush=True)
-    print(f"ok: ASPIRE {COMMIT[:7]} in third_party/ASPIRE. Next: uv run avail demo", flush=True)
+    print(f"ok: ASPIRE {COMMIT[:7]} in third_party/ASPIRE", flush=True)
     return 0
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    code = main()
+    if code == 0:
+        print("Next: uv run avail demo", flush=True)
+    raise SystemExit(code)

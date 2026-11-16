@@ -31,7 +31,9 @@ SPLITS = {"fit": "zoo_fit", "calibration": "zoo_calibration", "test": "zoo_test"
           "dev_hard": "dev",
           "fit_hard2": "zoo_fit_hard2", "calibration_hard2": "zoo_calibration_hard2", "test_hard2": "zoo_test_hard2",
           "dev_hard2": "dev",
-          "cable_fit": "cable_fit", "cable_calibration": "cable_calibration"}      # S5b: cable-loop insertions
+          "cable_fit": "cable_fit", "cable_calibration": "cable_calibration",      # S5b: cable-loop insertions
+          "check_fit": "check_fit", "check_calibration": "check_calibration",      # S5c fix: the hand-set checks' claims
+          "check_fit_drag": "check_fit_drag", "check_calibration_drag": "check_calibration_drag"}  # and the enrichment
 JPEG_QUALITY = 92
 
 

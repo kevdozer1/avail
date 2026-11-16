@@ -18,7 +18,9 @@ abstain goes to a person, and only an accept or a person's sign-off marks the st
    most a chosen alpha. When no stage is sure, the witness abstains.
 4. **Fork.** A reject with tries left goes back to the skill. A reject with no tries left, or an abstain, goes to a
    person with a handoff: what was claimed, what each source said, and the frames. The person confirms, rejects, or
-   takes over and fixes it.
+   takes over and fixes it. Before that call a task file can list recovery actions per predicate (`fork.ladder`),
+   each followed by the same witness on a fresh claim. The cable loop's are a 2nd look at the held cable, a regrip
+   and a reinsert. A recovery action never decides: only the witness can accept after it.
 5. **Done gate.** A step is done only with an accept verdict or a person's sign-off. No argument of any tool can
    mark a step done, and a test checks that no function accepts free text as a decision.
 6. **Ledger and exports.** Every claim, evidence value, verdict, question and takeover is 1 record. A person's answer
@@ -38,6 +40,6 @@ abstain goes to a person, and only an accept or a person's sign-off marks the st
 
 ## The truth wall
 
-The simulator knows whether each plug is seated. Only the zoo generator, the scorer and the simulated person may read
+The simulator knows whether each plug is seated. Only the zoo generator, the scorer and the simulated operator may read
 that. Evidence sources, witnesses and the fork never see it, and `tests/test_truth_wall.py` fails the suite if one
 does. This is what makes a measured error rate mean something: the check was scored against truth it could not read.

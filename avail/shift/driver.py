@@ -11,12 +11,17 @@ a small duck-typed interface, so it never imports a simulator or anything plug-s
   cell takes from the skill's result what its checks read
 - ``cell.now()`` (the cell's clock, seconds), ``cell.begin_assist() -> frame index`` and
   ``cell.end_assist() -> frame index`` (the handoff and the handback in the cell's frame log)
+- for a task file with a ``fork.ladder`` (2026-11-16, docs/07): ``cell.rung_begin(name, item, step) -> result or None``
+  (the recovery action, which may move the robot, and the step's new result when it made one) and
+  ``cell.rung_end(name, item, step)`` (back where the rung started, after a look from elsewhere)
 - a person's marks reach the cell as ``run_skill(..., marks=...)`` on the next try, and the cell reads them
 
 Arms (docs/07, E3): ``flag`` trusts each step's own flag. ``vlm`` trusts the flags, except that a
 judge decides the steps the task file marks ``judge: true`` (the cable loop's insertion). ``avail`` verifies every claim with the task's witnesses and follows
 the fork policy with no person: an abstain or a last reject leaves the item unresolved.
-``avail_human`` is the same with a person behind the fork. ``agent_looks`` (S5c, the figure run) is an agent that
+``avail_simop`` ("AVAIL + simulated operator") is the same with an operator behind the fork, in sim one that
+answers from simulator truth and takes over with a scripted correction. ``avail_human`` is that arm's name as E3
+recorded it (renamed 2026-11-13), still accepted so its ledgers read the same. ``agent_looks`` (S5c, the figure run) is an agent that
 checks its own work by looking: after every step a judge sees the step's frames (and, when the testbed gives them,
 the robot's readings), and its yes or no decides, with the flag arm's tries.
 
@@ -32,8 +37,10 @@ from dataclasses import dataclass, field
 
 from ..schemas import Claim, ClaimContext, Predicate, new_id
 
-ARMS = ("flag", "vlm", "avail", "avail_human", "agent_looks")
+ARMS = ("flag", "vlm", "avail", "avail_simop", "avail_human", "agent_looks")
 JUDGED_ARMS = ("vlm", "agent_looks")
+OPERATOR_ARMS = ("avail_simop", "avail_human")        # avail_human: E3's recorded name for avail_simop
+GATED_ARMS = ("avail", *OPERATOR_ARMS)
 
 
 @dataclass
@@ -77,8 +84,8 @@ class CycleDriver:
 
         if arm not in ARMS:
             raise ValueError(f"arm must be one of {ARMS}, got {arm!r}")
-        if arm == "avail_human" and human is None:
-            raise ValueError("the avail_human arm needs a human")
+        if arm in OPERATOR_ARMS and human is None:
+            raise ValueError(f"the {arm} arm needs an operator")
         self.task, self.cell, self.arm = task, cell, arm
         self.witnesses = witnesses or {}
         self.human = human
@@ -94,6 +101,13 @@ class CycleDriver:
         # ``self.audit`` for the report and never into a decision.
         self.evaluator = evaluator
         self.audit: list[dict] = []
+        # 2026-11-16 (docs/07, step 2): the escalation ladder from the task file, and 2 more evaluator-side records:
+        # every verdict with the claim's truth after its witness ran, and every rung with the truth before and after it
+        self.ladder = {k: list(v) for k, v in dict(task.fork.get("ladder", {})).items()}
+        self.ladder_after = {k: list(v) for k, v in dict(task.fork.get("ladder_after", {})).items()}
+        self.claim_audit: list[dict] = []
+        self.rung_audit: list[dict] = []
+        self._rung_now: str | None = None
 
     # ------------------------------------------------------------------ the ledger
     def _emit(self, kind: str, payload) -> None:
@@ -129,7 +143,7 @@ class CycleDriver:
             if not done:
                 log.unresolved = step.name
                 return log
-        if self.arm in ("avail", "avail_human"):
+        if self.arm in GATED_ARMS:
             ok, _ = self.gate.done(item)
             log.declared_done = bool(ok)
         else:
@@ -138,7 +152,7 @@ class CycleDriver:
 
     def _run_step(self, item: int, step, log: ItemLog) -> bool:
         """1 step until it is done, given up, or handed to a person. True when the step counts as done."""
-        attempt, marks, asks = 0, None, 0
+        attempt, marks, asks, laddered = 0, None, 0, False
         predicate = step.claim_for(self.cell.variant)
         while True:
             res = self.cell.run_skill(step.name, item, attempt, marks=marks)
@@ -181,6 +195,19 @@ class CycleDriver:
                 continue
             if plan.chosen != "ask_human" or self.human is None:
                 return False                             # abort: the item stays unresolved
+            if (not laddered and asks == 0 and self.ladder.get(predicate)
+                    and verdict.decision in self.ladder_after.get(predicate, ("abstain", "reject"))):
+                # before the 1st call to the operator on this step: the task's rungs, each followed by the same witness
+                laddered = True
+                outcome, claim, verdict, res = self._run_ladder(item, step, claim, verdict, res, attempt)
+                if outcome == "accept":
+                    return True
+                plan = self._fork(verdict, attempt, step)  # what happens next comes from the last verdict
+                if plan.chosen == "retry":                 # an abstain on a try with 1 left, rejected after its rung
+                    attempt += 1
+                    continue
+                if plan.chosen != "ask_human":
+                    return False
             asks += 1
             if asks > 1:                                 # back at a person after their own fix failed: they take over
                 outcome = self._takeover(item, step, claim, verdict, log)
@@ -211,7 +238,48 @@ class CycleDriver:
             self._emit("evidence", ev)
         self._emit("verdict", verdict)
         self._last_features = {f"{e.source_id}/{k}": v for e in evidence for k, v in e.features.items()}
+        if self.evaluator is not None:                   # evaluator-side, for the report: never read by a decision
+            self.claim_audit.append({"item": int(item), "step": step.name, "predicate": predicate,
+                                     "attempt": int(claim.context.attempt), "decision": verdict.decision,
+                                     "stage": int(verdict.stage_reached), "rung": self._rung_now,
+                                     "true": bool(self.evaluator(item, predicate))})
         return verdict
+
+    def _run_ladder(self, item: int, step, claim: Claim, verdict, res, attempt: int):
+        """The escalation ladder (docs/07, 2026-11-16): each rung is the cell's own recovery action, then the predicate's
+        witness on a fresh claim of the step at the same try. A rung never decides: only an accept from the witness ends
+        the ladder. Returns (``accept`` or ``operator``, the last claim, its verdict, the step's result)."""
+        predicate = claim.predicate.name
+        for rung in self.ladder.get(predicate, []):
+            before = bool(self.evaluator(item, predicate)) if self.evaluator is not None else None
+            t0 = self.cell.now()
+            out = self.cell.rung_begin(rung, item, step.name)
+            moved = max(0.0, self.cell.now() - t0)
+            self.log.motion_s += moved
+            res = out if out is not None else res
+            claim = self._claim(item, step, attempt)
+            self._emit("claim", claim)
+            self._emit("tool_call", {"tool": f"rung:{rung}", "cycle_id": self.cycle_id, "claim_id": claim.claim_id,
+                                     "skill": step.name, "item": item, "attempt": attempt, "after": verdict.decision,
+                                     "ok": bool(getattr(out, "ok", True)), "seconds": moved})
+            decision_before = verdict.decision
+            self._rung_now = rung
+            try:
+                verdict = self._verify(item, step, claim, res)
+            finally:
+                self._rung_now = None
+            t1 = self.cell.now()
+            self.cell.rung_end(rung, item, step.name)
+            self.log.motion_s += max(0.0, self.cell.now() - t1)
+            if self.evaluator is not None:
+                self.rung_audit.append({"item": int(item), "step": step.name, "predicate": predicate, "rung": rung,
+                                        "after": decision_before, "decision": verdict.decision, "true_before": before,
+                                        "true_after": bool(self.evaluator(item, predicate)), "seconds": moved})
+            if verdict.decision == "accept":
+                self.gate.record_accept(item, predicate, verdict)
+                self._decided_by = f"rung:{rung}"
+                return "accept", claim, verdict, res
+        return "operator", claim, verdict, res
 
     def _judge(self, item: int, step, claim: Claim, res) -> bool:
         """A judged arm: a judge's answer on a judged step. Its text never becomes a verdict: it only stops a retry loop."""

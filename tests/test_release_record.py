@@ -40,8 +40,14 @@ def test_a_lift_on_shut_jaws_is_remembered_across_tries():
 
 
 def test_the_released_stable_rule_rejects_a_release_that_lifted_the_plug():
-    spec = load_task("cable_loop").predicates["released_stable"]
-    assert "passive.release_record" in spec.checks
+    """The hand-set rule as E3 ran it. Since 2026-11-13 the task file decides released_stable by a calibrated witness,
+    which still reads passive.release_record."""
+    assert "passive.release_record" in load_task("cable_loop").predicates["released_stable"].checks
+    spec = {"name": "released_stable", "checks": ["passive.jaw_hold", "passive.release_record", "vision.gap@now"],
+            "decide": {"kind": "rule", "accept_all": [{"feature": "passive.jaw_hold/open", "above": 0.5}],
+                       "reject_any": [{"feature": "passive.jaw_hold/open", "below": 0.5},
+                                      {"feature": "passive.release_record/lifted_closed", "above": 0.5},
+                                      {"feature": "vision.gap@now/gap_mm_est", "above": 2.0}]}}
     rule = RuleWitness.from_predicate(spec, version="test")
     jaws_open = {"passive.jaw_hold/open": 1.0}
     assert rule.judge({**jaws_open, "passive.release_record/lifted_closed": 0.0}).decision == "accept"

@@ -25,8 +25,10 @@ def test_each_cycle_is_green_red_or_grey_and_the_times_are_multiples_of_the_skil
         _end(72001, "avail_human", wall=250.0, assists=3)])          # a rerun of a seed: the last one counts
     s = fig_readme.arm_summary(tmp_path)
     assert s["skill_done"]["outcomes"] == ["green", "red", "grey"]
-    assert (s["avail_human"]["n"], s["avail_human"]["time_x"]) == (2, 2.0)        # (150 + 250) / 2 over 100
-    assert s["avail_human"]["assists_per_100"] == 200.0
+    # avail_human is E3's and FIG's recorded name for avail_simop: its ledgers read as avail_simop
+    assert (s["avail_simop"]["n"], s["avail_simop"]["time_x"]) == (2, 2.0)        # (150 + 250) / 2 over 100
+    assert s["avail_simop"]["assists_per_100"] == 200.0
+    assert s["avail_simop"]["title"] == "AVAIL + simulated operator"
     assert "agent_looks" not in s                                                  # an arm with no ledger is left out
 
 

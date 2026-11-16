@@ -27,6 +27,7 @@ FINAL_RUNS = {
     "E1bE2b": "zoo_test_hard",      # S4b: E1 and E2 on hard mode
     "E1cE2c": "zoo_test_hard2",     # S4c: E1 and E2 on hard mode v2
     "FIG": "fig_test",              # S5c: the README figure, 100 cable-loop cycles per arm
+    "E3b": "shift_test_e3b",        # the 1 retest of the defect bar after the release fix (H3b)
 }
 
 
@@ -36,6 +37,10 @@ RETIRED_FINAL_RUNS = {
     "E1bE2b": "it read 64,000 to 65,999 for S4b on 2026-11-11, and the S4c judges read its stored frames on 2026-11-12, "
               "the last read its notes planned",
     "E1cE2c": "it read 70,000 to 71,999 for S4c on 2026-11-12. Its analysis reads the features on disk and needs no read",
+    "E3": "it read 30,000 to 34,999 on latch from 2026-11-12 19:42 to 2026-11-13 06:04 and failed H3's defect bar. "
+          "Its 1 retest is E3b on new seeds",
+    "FIG": "it read 72,000 to 72,099 on 2026-11-13 for the README figure, and the figure's re-render read 1 stored state",
+    "E3b": "it read 80,000 to 84,999 on latch on 2026-11-14 and passed H3b (2 of 5,000). It was the only retest",
 }
 
 

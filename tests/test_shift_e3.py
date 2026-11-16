@@ -261,6 +261,7 @@ def test_the_testbed_finds_what_prepare_has_not_made(monkeypatch, tmp_path):
 
     monkeypatch.setenv("AVAIL_DATA", str(tmp_path))
     _config(monkeypatch, e3=WITH_VLM)                                          # a judge arm needs its pictures
+    monkeypatch.setattr(cable_shift, "CHECKED", ())                            # the insertion's witness here, not the S5c 3
     refs = cable_shift.judge_reference_files()
     assert set(refs) == {"latch", "fric"} and all(tmp_path in path.parents for path in refs.values())
     said = cable_shift.prepare_problem(["latch", "fric"], 0.01)
@@ -477,8 +478,8 @@ def test_every_block_of_a_final_run_carries_the_record(monkeypatch, tmp_path):
     monkeypatch.setattr(runner, "run_block", lambda a: seen.append(a) or {"run_id": a[4], "cycles": 0, "skipped": 0,
                                                                             "wall_s": 0.0})
     record = {"tasks/cable_loop.yaml": "aaaaaaaaaaaa"}
-    runner.run_shift("cable_loop", "latch", "flag", list(range(30000, 30025)), shift="x", run_root=tmp_path,
-                     workers=1, final_run="E3", expected_setup=record)
+    runner.run_shift("cable_loop", "latch", "flag", list(range(40000, 40025)), shift="x", run_root=tmp_path,
+                     workers=1, final_run="E4", expected_setup=record)
     assert len(seen) == 3 and all(a[-1] == record for a in seen)               # 3 blocks of up to 10 seeds
 
 

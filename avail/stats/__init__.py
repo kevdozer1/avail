@@ -21,6 +21,7 @@ likely true. A bad argument raises ValueError with a message that says how to
 fix the call.
 """
 
+from .bootstrap import bootstrap_mean_upper
 from .conformal import (
     ABSTAIN,
     ACCEPT,
@@ -59,6 +60,7 @@ from .spc import Cusum, p_chart_limits
 from .stubs import prediction_powered_mean, rogan_gladen
 
 __all__ = [
+    "bootstrap_mean_upper",
     # intervals
     "wilson",
     "clopper_pearson",
