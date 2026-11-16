@@ -38,7 +38,982 @@
    "calls_per_100": 223.55999999999997,
    "calls_lo": 218.7395,
    "calls_hi": 228.88000000000002
+  },
+  {
+   "label": "dev, revised",
+   "arm": "avail_simop",
+   "cycles": 500,
+   "bad": 0,
+   "rate": 0.0,
+   "lo": 0.0,
+   "hi": 0.007624340461552241,
+   "ucb95": 0.005973551516349557,
+   "calls_per_100": 56.8,
+   "calls_lo": 49.0,
+   "calls_hi": 65.4
   }
  ],
- "flywheel": null
+ "flywheel": {
+  "days": [
+   {
+    "day": 1,
+    "seeds": [
+     5000,
+     5199
+    ],
+    "cycles": 200,
+    "calls_per_100": 59.0,
+    "calls_ub95": 70.0,
+    "bad_cycles": 0,
+    "bad_cycles_ci": [
+     0.0,
+     0.018845326377266575
+    ],
+    "labels_so_far": {
+     "held": 0,
+     "at_port": 19,
+     "released_stable": 56,
+     "latched": 18
+    },
+    "held_out": {
+     "held": {
+      "good": 2500,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015342260617824607
+      ],
+      "bad": 95,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.038864853539472964
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "at_port": {
+      "good": 2682,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0014302626866072885
+      ],
+      "bad": 354,
+      "bad_accepted": 12,
+      "bad_accepted_ci": [
+       0.019495710339815394,
+       0.05830818335223671
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "released_stable": {
+      "good": 2475,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015496992786790385
+      ],
+      "bad": 152,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.024649787352889047
+      ],
+      "missing": 9,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "latched": {
+      "good": 2468,
+      "good_to_operator": 1,
+      "good_to_operator_ci": [
+       7.15289274861113e-05,
+       0.002291672320655856
+      ],
+      "bad": 445,
+      "bad_accepted": 1,
+      "bad_accepted_ci": [
+       0.00039679459398485935,
+       0.012617731372583006
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.2
+     }
+    },
+    "calls_lo": 47.5,
+    "calls_hi": 72.0
+   },
+   {
+    "day": 2,
+    "seeds": [
+     5200,
+     5399
+    ],
+    "cycles": 200,
+    "calls_per_100": 61.0,
+    "calls_ub95": 72.5,
+    "bad_cycles": 0,
+    "bad_cycles_ci": [
+     0.0,
+     0.018845326377266575
+    ],
+    "labels_so_far": {
+     "held": 0,
+     "at_port": 40,
+     "released_stable": 116,
+     "latched": 27
+    },
+    "held_out": {
+     "held": {
+      "good": 2500,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015342260617824607
+      ],
+      "bad": 95,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.038864853539472964
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "at_port": {
+      "good": 2682,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0014302626866072885
+      ],
+      "bad": 354,
+      "bad_accepted": 12,
+      "bad_accepted_ci": [
+       0.019495710339815394,
+       0.05830818335223671
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "released_stable": {
+      "good": 2475,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015496992786790385
+      ],
+      "bad": 152,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.024649787352889047
+      ],
+      "missing": 9,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "latched": {
+      "good": 2468,
+      "good_to_operator": 1,
+      "good_to_operator_ci": [
+       7.15289274861113e-05,
+       0.002291672320655856
+      ],
+      "bad": 445,
+      "bad_accepted": 1,
+      "bad_accepted_ci": [
+       0.00039679459398485935,
+       0.012617731372583006
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.2
+     }
+    },
+    "calls_lo": 47.48750000000007,
+    "calls_hi": 75.0
+   },
+   {
+    "day": 3,
+    "seeds": [
+     5400,
+     5599
+    ],
+    "cycles": 200,
+    "calls_per_100": 60.5,
+    "calls_ub95": 71.0,
+    "bad_cycles": 0,
+    "bad_cycles_ci": [
+     0.0,
+     0.018845326377266575
+    ],
+    "labels_so_far": {
+     "held": 0,
+     "at_port": 62,
+     "released_stable": 169,
+     "latched": 41
+    },
+    "held_out": {
+     "held": {
+      "good": 2500,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015342260617824607
+      ],
+      "bad": 95,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.038864853539472964
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "at_port": {
+      "good": 2682,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0014302626866072885
+      ],
+      "bad": 354,
+      "bad_accepted": 12,
+      "bad_accepted_ci": [
+       0.019495710339815394,
+       0.05830818335223671
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "released_stable": {
+      "good": 2475,
+      "good_to_operator": 1,
+      "good_to_operator_ci": [
+       7.13266133480963e-05,
+       0.002285201191166353
+      ],
+      "bad": 152,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.024649787352889047
+      ],
+      "missing": 14,
+      "to_operator_per_100_cycles": 0.2
+     },
+     "latched": {
+      "good": 2468,
+      "good_to_operator": 1,
+      "good_to_operator_ci": [
+       7.15289274861113e-05,
+       0.002291672320655856
+      ],
+      "bad": 445,
+      "bad_accepted": 1,
+      "bad_accepted_ci": [
+       0.00039679459398485935,
+       0.012617731372583006
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.2
+     }
+    },
+    "calls_lo": 48.5,
+    "calls_hi": 73.01249999999993
+   },
+   {
+    "day": 4,
+    "seeds": [
+     5600,
+     5799
+    ],
+    "cycles": 200,
+    "calls_per_100": 61.0,
+    "calls_ub95": 75.0,
+    "bad_cycles": 0,
+    "bad_cycles_ci": [
+     0.0,
+     0.018845326377266575
+    ],
+    "labels_so_far": {
+     "held": 0,
+     "at_port": 89,
+     "released_stable": 215,
+     "latched": 52
+    },
+    "held_out": {
+     "held": {
+      "good": 2500,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015342260617824607
+      ],
+      "bad": 95,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.038864853539472964
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "at_port": {
+      "good": 2682,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0014302626866072885
+      ],
+      "bad": 354,
+      "bad_accepted": 12,
+      "bad_accepted_ci": [
+       0.019495710339815394,
+       0.05830818335223671
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "released_stable": {
+      "good": 2475,
+      "good_to_operator": 6,
+      "good_to_operator_ci": [
+       0.0011115110103069288,
+       0.005279159423384574
+      ],
+      "bad": 152,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.024649787352889047
+      ],
+      "missing": 16,
+      "to_operator_per_100_cycles": 1.2
+     },
+     "latched": {
+      "good": 2468,
+      "good_to_operator": 1,
+      "good_to_operator_ci": [
+       7.15289274861113e-05,
+       0.002291672320655856
+      ],
+      "bad": 445,
+      "bad_accepted": 1,
+      "bad_accepted_ci": [
+       0.00039679459398485935,
+       0.012617731372583006
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.2
+     }
+    },
+    "calls_lo": 46.0,
+    "calls_hi": 78.5
+   },
+   {
+    "day": 5,
+    "seeds": [
+     5800,
+     5999
+    ],
+    "cycles": 200,
+    "calls_per_100": 55.5,
+    "calls_ub95": 66.0,
+    "bad_cycles": 0,
+    "bad_cycles_ci": [
+     0.0,
+     0.018845326377266575
+    ],
+    "labels_so_far": {
+     "held": 0,
+     "at_port": 112,
+     "released_stable": 259,
+     "latched": 65
+    },
+    "held_out": {
+     "held": {
+      "good": 2500,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015342260617824607
+      ],
+      "bad": 95,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.038864853539472964
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "at_port": {
+      "good": 2682,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0014302626866072885
+      ],
+      "bad": 354,
+      "bad_accepted": 12,
+      "bad_accepted_ci": [
+       0.019495710339815394,
+       0.05830818335223671
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "released_stable": {
+      "good": 2475,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015496992786790385
+      ],
+      "bad": 152,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.024649787352889047
+      ],
+      "missing": 20,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "latched": {
+      "good": 2468,
+      "good_to_operator": 1,
+      "good_to_operator_ci": [
+       7.15289274861113e-05,
+       0.002291672320655856
+      ],
+      "bad": 445,
+      "bad_accepted": 1,
+      "bad_accepted_ci": [
+       0.00039679459398485935,
+       0.012617731372583006
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.2
+     }
+    },
+    "calls_lo": 44.0,
+    "calls_hi": 68.0
+   },
+   {
+    "day": 6,
+    "seeds": [
+     6000,
+     6199
+    ],
+    "cycles": 200,
+    "calls_per_100": 50.5,
+    "calls_ub95": 60.5,
+    "bad_cycles": 0,
+    "bad_cycles_ci": [
+     0.0,
+     0.018845326377266575
+    ],
+    "labels_so_far": {
+     "held": 0,
+     "at_port": 135,
+     "released_stable": 293,
+     "latched": 78
+    },
+    "held_out": {
+     "held": {
+      "good": 2500,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015342260617824607
+      ],
+      "bad": 95,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.038864853539472964
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "at_port": {
+      "good": 2682,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0014302626866072885
+      ],
+      "bad": 354,
+      "bad_accepted": 13,
+      "bad_accepted_ci": [
+       0.021584718733282722,
+       0.06180824226972665
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "released_stable": {
+      "good": 2475,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015496992786790385
+      ],
+      "bad": 152,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.024649787352889047
+      ],
+      "missing": 24,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "latched": {
+      "good": 2468,
+      "good_to_operator": 1,
+      "good_to_operator_ci": [
+       7.15289274861113e-05,
+       0.002291672320655856
+      ],
+      "bad": 445,
+      "bad_accepted": 1,
+      "bad_accepted_ci": [
+       0.00039679459398485935,
+       0.012617731372583006
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.2
+     }
+    },
+    "calls_lo": 38.5,
+    "calls_hi": 62.0
+   },
+   {
+    "day": 7,
+    "seeds": [
+     6200,
+     6399
+    ],
+    "cycles": 200,
+    "calls_per_100": 47.5,
+    "calls_ub95": 56.49999999999999,
+    "bad_cycles": 1,
+    "bad_cycles_ci": [
+     0.0008831687156009797,
+     0.02777370439789293
+    ],
+    "labels_so_far": {
+     "held": 0,
+     "at_port": 152,
+     "released_stable": 325,
+     "latched": 98
+    },
+    "held_out": {
+     "held": {
+      "good": 2500,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015342260617824607
+      ],
+      "bad": 95,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.038864853539472964
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "at_port": {
+      "good": 2682,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0014302626866072885
+      ],
+      "bad": 354,
+      "bad_accepted": 13,
+      "bad_accepted_ci": [
+       0.021584718733282722,
+       0.06180824226972665
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "released_stable": {
+      "good": 2475,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015496992786790385
+      ],
+      "bad": 152,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.024649787352889047
+      ],
+      "missing": 25,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "latched": {
+      "good": 2468,
+      "good_to_operator": 1,
+      "good_to_operator_ci": [
+       7.15289274861113e-05,
+       0.002291672320655856
+      ],
+      "bad": 445,
+      "bad_accepted": 1,
+      "bad_accepted_ci": [
+       0.00039679459398485935,
+       0.012617731372583006
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.2
+     }
+    },
+    "calls_lo": 37.5,
+    "calls_hi": 57.49999999999999
+   },
+   {
+    "day": 8,
+    "seeds": [
+     6400,
+     6599
+    ],
+    "cycles": 200,
+    "calls_per_100": 47.5,
+    "calls_ub95": 58.5,
+    "bad_cycles": 0,
+    "bad_cycles_ci": [
+     0.0,
+     0.018845326377266575
+    ],
+    "labels_so_far": {
+     "held": 0,
+     "at_port": 165,
+     "released_stable": 372,
+     "latched": 112
+    },
+    "held_out": {
+     "held": {
+      "good": 2500,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015342260617824607
+      ],
+      "bad": 95,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.038864853539472964
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "at_port": {
+      "good": 2682,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0014302626866072885
+      ],
+      "bad": 354,
+      "bad_accepted": 13,
+      "bad_accepted_ci": [
+       0.021584718733282722,
+       0.06180824226972665
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "released_stable": {
+      "good": 2475,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015496992786790385
+      ],
+      "bad": 152,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.024649787352889047
+      ],
+      "missing": 29,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "latched": {
+      "good": 2468,
+      "good_to_operator": 1,
+      "good_to_operator_ci": [
+       7.15289274861113e-05,
+       0.002291672320655856
+      ],
+      "bad": 445,
+      "bad_accepted": 1,
+      "bad_accepted_ci": [
+       0.00039679459398485935,
+       0.012617731372583006
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.2
+     }
+    },
+    "calls_lo": 35.0,
+    "calls_hi": 60.5
+   },
+   {
+    "day": 9,
+    "seeds": [
+     6600,
+     6799
+    ],
+    "cycles": 200,
+    "calls_per_100": 55.0,
+    "calls_ub95": 67.0,
+    "bad_cycles": 0,
+    "bad_cycles_ci": [
+     0.0,
+     0.018845326377266575
+    ],
+    "labels_so_far": {
+     "held": 0,
+     "at_port": 189,
+     "released_stable": 413,
+     "latched": 123
+    },
+    "held_out": {
+     "held": {
+      "good": 2500,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015342260617824607
+      ],
+      "bad": 95,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.038864853539472964
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "at_port": {
+      "good": 2682,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0014302626866072885
+      ],
+      "bad": 354,
+      "bad_accepted": 13,
+      "bad_accepted_ci": [
+       0.021584718733282722,
+       0.06180824226972665
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "released_stable": {
+      "good": 2475,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015496992786790385
+      ],
+      "bad": 152,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.024649787352889047
+      ],
+      "missing": 31,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "latched": {
+      "good": 2468,
+      "good_to_operator": 1,
+      "good_to_operator_ci": [
+       7.15289274861113e-05,
+       0.002291672320655856
+      ],
+      "bad": 445,
+      "bad_accepted": 1,
+      "bad_accepted_ci": [
+       0.00039679459398485935,
+       0.012617731372583006
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.2
+     }
+    },
+    "calls_lo": 42.0,
+    "calls_hi": 69.5
+   },
+   {
+    "day": 10,
+    "seeds": [
+     6800,
+     6999
+    ],
+    "cycles": 200,
+    "calls_per_100": 34.5,
+    "calls_ub95": 43.0,
+    "bad_cycles": 0,
+    "bad_cycles_ci": [
+     0.0,
+     0.018845326377266575
+    ],
+    "labels_so_far": {
+     "held": 0,
+     "at_port": 199,
+     "released_stable": 442,
+     "latched": 136
+    },
+    "held_out": {
+     "held": {
+      "good": 2500,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015342260617824607
+      ],
+      "bad": 95,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.038864853539472964
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "at_port": {
+      "good": 2682,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0014302626866072885
+      ],
+      "bad": 354,
+      "bad_accepted": 13,
+      "bad_accepted_ci": [
+       0.021584718733282722,
+       0.06180824226972665
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "released_stable": {
+      "good": 2475,
+      "good_to_operator": 0,
+      "good_to_operator_ci": [
+       0.0,
+       0.0015496992786790385
+      ],
+      "bad": 152,
+      "bad_accepted": 0,
+      "bad_accepted_ci": [
+       0.0,
+       0.024649787352889047
+      ],
+      "missing": 35,
+      "to_operator_per_100_cycles": 0.0
+     },
+     "latched": {
+      "good": 2468,
+      "good_to_operator": 1,
+      "good_to_operator_ci": [
+       7.15289274861113e-05,
+       0.002291672320655856
+      ],
+      "bad": 445,
+      "bad_accepted": 1,
+      "bad_accepted_ci": [
+       0.00039679459398485935,
+       0.012617731372583006
+      ],
+      "missing": 0,
+      "to_operator_per_100_cycles": 0.2
+     }
+    },
+    "calls_lo": 24.5,
+    "calls_hi": 45.01249999999993
+   }
+  ],
+  "day0": {
+   "held_out": {
+    "held": {
+     "good": 2500,
+     "good_to_operator": 0,
+     "good_to_operator_ci": [
+      0.0,
+      0.0015342260617824607
+     ],
+     "bad": 95,
+     "bad_accepted": 0,
+     "bad_accepted_ci": [
+      0.0,
+      0.038864853539472964
+     ],
+     "missing": 0,
+     "to_operator_per_100_cycles": 0.0
+    },
+    "at_port": {
+     "good": 2682,
+     "good_to_operator": 0,
+     "good_to_operator_ci": [
+      0.0,
+      0.0014302626866072885
+     ],
+     "bad": 354,
+     "bad_accepted": 12,
+     "bad_accepted_ci": [
+      0.019495710339815394,
+      0.05830818335223671
+     ],
+     "missing": 0,
+     "to_operator_per_100_cycles": 0.0
+    },
+    "released_stable": {
+     "good": 2475,
+     "good_to_operator": 0,
+     "good_to_operator_ci": [
+      0.0,
+      0.0015496992786790385
+     ],
+     "bad": 152,
+     "bad_accepted": 0,
+     "bad_accepted_ci": [
+      0.0,
+      0.024649787352889047
+     ],
+     "missing": 0,
+     "to_operator_per_100_cycles": 0.0
+    },
+    "latched": {
+     "good": 2468,
+     "good_to_operator": 1,
+     "good_to_operator_ci": [
+      7.15289274861113e-05,
+      0.002291672320655856
+     ],
+     "bad": 445,
+     "bad_accepted": 1,
+     "bad_accepted_ci": [
+      0.00039679459398485935,
+      0.012617731372583006
+     ],
+     "missing": 0,
+     "to_operator_per_100_cycles": 0.2
+    }
+   },
+   "held_out_cycles": 500
+  }
+ }
 }

@@ -1,6 +1,6 @@
 # AVAIL
 
-![Calls for help per 100 cycles against cycles with a bad cable shipped, in simulation with a simulated operator: the skills alone shipped a bad cable in 662 of 1,000 cycles at 0 calls, E3 in 31 of 5,000 at 119 calls, E3b in 2 of 5,000 at 224 calls, against a 0.5% bar](docs/img/frontier.png)
+![Calls for help per 100 cycles against cycles with a bad cable shipped, in simulation with a simulated operator: the skills alone shipped a bad cable in 662 of 1,000 cycles at 0 calls, E3 in 31 of 5,000 at 119 calls, E3b in 2 of 5,000 at 224 calls, and the code here in 0 of 500 dev cycles at 57 calls, against a 0.5% bar. A small panel shows calls per 100 cycles over 10 simulated days of recalibration](docs/img/frontier.png)
 
 AVAIL is a verification and ask-for-help layer for agentic robot stacks. A step counts as done only when calibrated
 evidence or a person says so. Each check's false-accept rate is bounded by class-conditional conformal calibration.
@@ -9,9 +9,11 @@ Uncertain or failed steps go to recovery actions and then to an operator. Every 
 Everything in this repository is simulation, and the operator is simulated too: it answers from simulator truth and
 takes over with a scripted correction. In the figure a simulated dual-arm YAM picks 5 cables per cycle and plugs each
 into its assigned `latch` port. A cycle ships a bad cable when it ends declared done while a cable is not seated,
-latched and let go in its assigned port. Each point is 1 run on test seeds read once, with 95% intervals. The dashed
-line is the bar set before the runs: under 0.5% of cycles at 95% confidence, which allows at most 16 bad cycles in
-5,000.
+latched and let go in its assigned port. Each point is 1 run with 95% intervals: 3 on test seeds read once, and the
+point marked dev on 500 dev cycles of the code here, drawn at its one-sided bound since it had 0 bad cycles. The
+dashed line is the bar set before the runs: under 0.5% of cycles at 95% confidence, which allows at most 16 bad cycles
+in 5,000. The small panel is 10 simulated days of 200 dev cycles, each day's thresholds recalibrated on the operator's
+answers from the days before.
 
 | Sim, `latch`, test seeds read once | Cycles | Cycles with a bad cable shipped | Calls for help per 100 cycles | Time per cycle |
 |---|---|---|---|---|
@@ -94,14 +96,16 @@ per 100 cycles.
 ## What this does not show
 
 - No real hardware yet. Every number is simulation. A real camera, connector and force estimate will be noisier.
-- The operator is simulated. It answers from simulator truth, so it is never wrong, and it takes over with a scripted
-  correction.
+- The operator is simulated. It answers from simulator truth, is wrong on 2% of confirms by design, and takes over
+  with a scripted correction.
 - E3b met the bar at a high cost: 223.6 calls for help per 100 cycles and 2.2 robots per operator. A run that asks
   for the same bar at half the calls, E4, is written down in `config/experiment.yaml` and has not run.
 - The code here is 2 days newer than E3b. It adds the recovery ladder (a 2nd look, a regrip or a reinsert before a
   call), per-check alphas from an error budget and a rule for crossed thresholds, all chosen on dev and calibration
   seeds. None of them has a test-seed result. A 1st gate on 500 dev cycles, which allows at most 1 bad cycle, failed
-  with 2 in its 1st 154, both after a recovery action that was then dropped.
+  with 2 in its 1st 154, both after a recovery action that was then dropped. Without it, 500 new dev cycles had 0 bad
+  cycles at 56.8 calls for help per 100 cycles and 4.9 robots per operator. 0 in 500 bounds the rate at 0.60%, so
+  that is a dev number and cannot meet the bar alone.
 - ASPIRE's real server was not run. The proxy was tested against a mock built from ASPIRE's own tool definitions.
 - The closed-loop judge is a cheap model. A stronger judge may pass fewer bad plugs and was not run in closed loop.
 - The bounds hold for states like these: this station and this mix of failures.
