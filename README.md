@@ -1,16 +1,16 @@
 # AVAIL
 
-![Calls for help per 100 cycles against cycles with a bad cable shipped, in simulation with a simulated operator: the skills alone shipped a bad cable in 662 of 1,000 cycles at 0 calls, E3 in 31 of 5,000 at 119 calls, E3b in 2 of 5,000 at 224 calls, and the code here in 0 of 500 dev cycles at 57 calls, against a 0.5% bar. A small panel shows calls per 100 cycles over 10 simulated days of recalibration](docs/img/frontier.png)
+![Calls for help per 100 cycles against cycles with a bad cable shipped, in simulation with a simulated operator: the skills alone shipped a bad cable in 662 of 1,000 cycles at 0 calls, E3 in 31 of 5,000 at 119 calls, E3b in 2 of 5,000 at 224 calls, and E4, the code here, in 1 of 5,000 at 58 calls, against a 0.5% bar. A small panel shows calls per 100 cycles over 10 simulated days of recalibration](docs/img/frontier.png)
 
 AVAIL is a verification and ask-for-help layer for agentic robot stacks. A step counts as done only when calibrated
 evidence or a person says so. Each check's false-accept rate is bounded by class-conditional conformal calibration.
-Uncertain or failed steps go to recovery actions and then to an operator. Every answer is recorded for recalibration.
+When a check says no, the robot retries the step and, where the task has one, runs a recovery action, and the same
+check decides again. Only then does it call an operator. Every answer is recorded for recalibration.
 
 Everything in this repository is simulation, and the operator is simulated too: it answers from simulator truth and
 takes over with a scripted correction. In the figure a simulated dual-arm YAM picks 5 cables per cycle and plugs each
 into its assigned `latch` port. A cycle ships a bad cable when it ends declared done while a cable is not seated,
-latched and let go in its assigned port. Each point is 1 run with 95% intervals: 3 on test seeds read once, and the
-point marked dev on 500 dev cycles of the code here, drawn at its one-sided bound since it had 0 bad cycles. The
+latched and let go in its assigned port. Each point is 1 run on test seeds read once, with 95% intervals. The
 dashed line is the bar set before the runs: under 0.5% of cycles at 95% confidence, which allows at most 16 bad cycles
 in 5,000. The small panel is 10 simulated days of 200 dev cycles, each day's thresholds recalibrated on the operator's
 answers from the days before.
@@ -20,14 +20,20 @@ answers from the days before.
 | The skills' own done flags, on E3b's seeds | 1,000 | 662 (66.2%, 63.2 to 69.1) | 0 | 87 s |
 | E3: AVAIL with the simulated operator | 5,000 | 31 (0.62%, 0.44 to 0.88), bound 0.84% | 118.7 | 157 s |
 | E3b: the same after its checks were fixed | 5,000 | 2 (0.04%, 0.01 to 0.15), bound 0.13% | 223.6 | 219 s |
+| E4: the code here, after 4 more changes | 5,000 | 1 (0.02%, 0.004 to 0.11), bound 0.095% | 57.8 | 160 s |
 
-Rates carry a Wilson 95% interval, and bounds are one-sided 95% Clopper-Pearson. E3 missed the bar. Every bad cable
-it shipped passed at the release step, through a hand-set rule with no calibrated bound. Before E3b the 3 hand-set
-checks became calibrated witnesses, and the release check learned to close the jaws on the released plug and pull it
-lightly, which a latched plug holds. E3b met the bar on new seeds, at 223.6 calls for help per 100 cycles and 2.53
-times the skills' cycle time. The 2 runs are not 2 tests of 1 system, and E3's failure stays on record. Both ran
-before the recovery ladder in this code existed. In them the only recovery was 1 retry of a rejected step, and an
-uncertain step went straight to the operator. [RESULTS.md](docs/RESULTS.md) has every table.
+Rates carry a Wilson 95% interval, and bounds are one-sided 95% Clopper-Pearson. E3 missed the bar. Every bad cable it
+shipped passed at the release step, through a hand-set rule with no calibrated bound. Before E3b the 3 hand-set checks
+became calibrated witnesses, and the release check learned to close the jaws on the released plug and pull it lightly,
+which a latched plug holds. E3b met the bar on new seeds, at 223.6 calls for help per 100 cycles and 2.53 times the
+skills' cycle time. In E3 and E3b the only recovery was 1 retry of a rejected step. E4 ran the code here, which adds 4
+changes chosen on dev and calibration seeds: 2 features that let the release pull tell a stall from a hold, new alphas
+for 3 of the checks, 2 of them from an error budget, a rule that lets those 3 accept where their 2 thresholds cross
+instead of abstaining, and recovery actions after the carry's and the insertion's last reject or an abstain (a regrip
+of a cable that hangs crooked over its port, a reinsert of the plug). On new seeds it met the same bar with 1 bad
+cycle in 5,000, at 57.8 calls for help per 100 cycles and 1.85 times the skills' cycle time, so 1 operator covers 4.8
+robots against E3b's 2.2. The 4 changes ran together. The 3 runs are not 3 tests of 1 system, and E3's failure stays
+on record. [RESULTS.md](docs/RESULTS.md) has every table.
 
 ## Run the demo: 1 command
 
@@ -60,8 +66,8 @@ skip and say so.
 In simulation, agentic robotics systems grade themselves with privileged truth: ASPIRE keeps the programs its
 benchmark scores as successes, RPG practices against simulator checkers, and EmbodiedSWE grades against hidden rubrics
 and trains only on verified outcomes. On a real robot that grader is gone. AVAIL is a grader you can take to the real
-robot: physical checks with an error rate measured against sim truth, a person when it cannot tell, and every
-intervention logged as labeled data, all outside the agent.
+robot: physical checks with an error rate measured against sim truth, a retry or a recovery action when a check says
+no, a person when those fail, and every intervention logged as labeled data, all outside the agent.
 
 ## Use it
 
@@ -97,15 +103,20 @@ per 100 cycles.
 
 - No real hardware yet. Every number is simulation. A real camera, connector and force estimate will be noisier.
 - The operator is simulated. It answers from simulator truth, is wrong on 2% of confirms by design, and takes over
-  with a scripted correction.
-- E3b met the bar at a high cost: 223.6 calls for help per 100 cycles and 2.2 robots per operator. A run that asks
-  for the same bar at half the calls, E4, is written down in `config/experiment.yaml` and has not run.
-- The code here is 2 days newer than E3b. It adds the recovery ladder (a 2nd look, a regrip or a reinsert before a
-  call), per-check alphas from an error budget and a rule for crossed thresholds, all chosen on dev and calibration
-  seeds. None of them has a test-seed result. A 1st gate on 500 dev cycles, which allows at most 1 bad cycle, failed
-  with 2 in its 1st 154, both after a recovery action that was then dropped. Without it, 500 new dev cycles had 0 bad
-  cycles at 56.8 calls for help per 100 cycles and 4.9 robots per operator. 0 in 500 bounds the rate at 0.60%, so
-  that is a dev number and cannot meet the bar alone.
+  with a scripted correction. E4 asked it no confirm.
+- E4 met the bar once, on 1 connector. Its design was revised after a failed gate: a 1st gate on 500 dev cycles,
+  which allows at most 1 bad cycle, failed with 2 in its 1st 154. A recovery action was dropped, 2 bugs were fixed and
+  2 other recovery changes were made, a 2nd gate passed on 500 fresh dev cycles, and E4 then read its seeds once. The
+  bar and the hypotheses did not change. The 4 changes since E3b ran together, so E4 cannot say which one cut the calls.
+- E4's 1 bad cable passed the release check's 1st stage, as both bad cycles of the failed gate had. In all 3 the
+  gripper's fingers stuck on the 1st release try, the camera later lost the plug and read a steep slant, and the
+  check's 1st stage, a score linear in its readings, accepted a later claim of that release. That makes 3
+  occurrences, a pattern to fix by this project's own rule. The check here is as E4 ran it.
+- The pull's stall features cover 1 of E3b's 2 stalls. Scored again on their recorded evidence, the check here
+  rejects 1 and still accepts the other, and E4 had no bad release whose pull stalled.
+- Calls are counted, and a takeover costs far more than a confirm. 541 of E4's 2,892 calls came after the release
+  check rejected a good 2nd try. It weighs a 2nd release try heavily toward bad, because in its tables a 2nd try
+  followed only a 1st that truly failed.
 - ASPIRE's real server was not run. The proxy was tested against a mock built from ASPIRE's own tool definitions.
 - The closed-loop judge is a cheap model. A stronger judge may pass fewer bad plugs and was not run in closed loop.
 - The bounds hold for states like these: this station and this mix of failures.

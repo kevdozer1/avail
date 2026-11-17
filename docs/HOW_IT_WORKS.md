@@ -1,7 +1,9 @@
 # How AVAIL works
 
-Level 1: a skill claims a step is done, AVAIL gathers evidence, a calibrated check accepts, rejects or abstains, an
-abstain goes to a person, and only an accept or a person's sign-off marks the step done.
+Level 1: a skill claims a step is done, AVAIL gathers evidence, and a calibrated check accepts, rejects or abstains.
+A reject is retried while tries are left. After the last reject, or after an abstain, a recovery action runs where the
+task lists one and the same check decides again. A step that is still not settled goes to a person, or back to the
+skill when a reject leaves a try. Only an accept or a person's sign-off marks the step done.
 
 ![The loop](img/loop.svg)
 
@@ -19,8 +21,9 @@ abstain goes to a person, and only an accept or a person's sign-off marks the st
 4. **Fork.** A reject with tries left goes back to the skill. A reject with no tries left, or an abstain, goes to a
    person with a handoff: what was claimed, what each source said, and the frames. The person confirms, rejects, or
    takes over and fixes it. Before that call a task file can list recovery actions per predicate (`fork.ladder`),
-   each followed by the same witness on a fresh claim. The cable loop's are a 2nd look at the held cable, a regrip
-   and a reinsert. A recovery action never decides: only the witness can accept after it.
+   each followed by the same witness on a fresh claim. The cable loop's are a regrip for the carry and a reinsert
+   for the insertion, after the last reject or an abstain, and a 2nd look at the held cable after an abstain only. A
+   recovery action never decides: only the witness can accept after it.
 5. **Done gate.** A step is done only with an accept verdict or a person's sign-off. No argument of any tool can
    mark a step done, and a test checks that no function accepts free text as a decision.
 6. **Ledger and exports.** Every claim, evidence value, verdict, question and takeover is 1 record. A person's answer

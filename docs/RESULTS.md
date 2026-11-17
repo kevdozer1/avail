@@ -3,7 +3,7 @@
 Level 1: in simulation, a skill's own done flag passes about 80% of bad plugs, a tug passes about 2%, a cheap VLM
 judge 18% to 32%, and AVAIL's calibrated cascade under 1%, asking a person about 3% of the time. On a 5-cable loop with
 a simulated operator, AVAIL shipped a bad cable in 31 of 5,000 cycles in E3 and, after its checks were fixed, in 2 of
-5,000 in E3b, at 223.6 calls for help per 100 cycles.
+5,000 in E3b, at 223.6 calls for help per 100 cycles. E4, the code here, shipped 1 in 5,000 at 57.8 calls.
 
 Every number on this page is simulation, from the plug and cable station in `avail/station/mj_plug`, scored against
 truth the checks never read. Test seeds were read once. Rates carry a Wilson 95% interval, and bounds are one-sided
@@ -60,8 +60,9 @@ Luna's low rate comes from saying no to almost every plug, good ones too.
 ## The cable loop (sim)
 
 A cycle picks 5 cables from a rack and plugs each into its assigned `latch` port. Arms: `flag` (`skill_done` in E3b)
-trusts each skill's own done, `avail` gates each step and never asks, `avail_simop` gates each step and asks a
-simulated operator when it cannot tell. E3 recorded that arm under its old name, `avail_human`. The simulated operator
+trusts each skill's own done, `avail` gates each step and never asks, `avail_simop` gates each step and calls a
+simulated operator when its checks and recovery do not settle the step. E3 recorded that arm under its old name,
+`avail_human`. The simulated operator
 answers from truth and takes over with a scripted correction. A cycle ships a bad cable when it ends declared done
 while a cable is not seated, latched and let go in its assigned port.
 
@@ -107,11 +108,64 @@ the operator's answering and handling time per cycle. The pull adds 18.4 s of ch
 the calls: a cable cocked in the jaws stays cocked when the carry is tried again. The 2 runs are not 2 tests of 1
 system. E3b's checks were changed after E3 failed, and it ran on new seeds. E3's failure stays on record.
 
-![Calls for help per 100 cycles against cycles with a bad cable shipped, for the skills alone, E3 and E3b](img/frontier.png)
-
 E3 and E3b ran before the recovery ladder that is in the code now (`fork.ladder` in `tasks/cable_loop.yaml`). In both,
-a rejected step was retried once, and an uncertain step or a 2nd reject went to the operator. The ladder has no
-test-seed result.
+a rejected step was retried once, and an uncertain step or a 2nd reject went to the operator. E4 below tests the
+ladder together with 3 other changes.
+
+### E4: the same bar at a quarter of E3b's calls (sim, `latch`, new test seeds read once)
+
+E4 asked whether the bar holds at a cost a deployment would accept. Written before the run: H4a, `avail_simop` ships a
+bad cable in under 0.5% of cycles at 95% (at most 16 of 5,000), and H4b, the one-sided 95% upper bound on its calls
+for help per 100 cycles, from a bootstrap over cycles, is at most 112, half of E3b's 224. Both had to pass. 4 things
+changed after E3b, all chosen on dev and calibration seeds. The release pull got 2 features that tell a pull that
+stalled from one that held. `held` and `released_stable` got alphas from an error budget whose union bound is 0.477%
+per cycle, `at_port` got 0.025, the alpha with the fewest claims sent to the operator plus bad claims passed on, and
+the insertion check kept 0.01. Where a stage's 2 thresholds cross, the pick, carry and release checks now accept
+above their accept threshold, where E3b's abstained between the 2. The insertion check keeps that abstain. And after
+the last reject of a carry or an insertion, or an abstain, the robot regrips a cable that hangs crooked over its port
+or reinserts the plug, and the same check decides again on a fresh claim. The pick and the release have no such
+action after a reject, so they call after their 2nd try as before. A 1st gate on dev seeds failed
+with 2 bad cycles in 154, both after a 4th recovery action that pushed the released plug home. That action was
+dropped, 2 bugs were fixed, 2 other recovery changes were made (a 2nd look at a held cable only after an abstain, and
+the regrip carrying through the stand-in's waypoint), and a 2nd gate on 500 fresh dev cycles passed. E4 read seeds
+40,000 to 44,999 once, on 2026-11-16, with `skill_done` on the 1st 1,000 of them. The code in this repository is
+the code E4 ran, except the demo's fresh-clone setup and the figure script.
+
+| Sim, E4, 2026-11-16 | `skill_done` | `avail_simop` |
+|---|---|---|
+| Cycles | 1,000 | 5,000 |
+| Cycles with a bad cable shipped | 65.4% (654, 62.4 to 68.3) | 0.02% (1, 0.004 to 0.11), bound 0.095% |
+| Calls for help per 100 cycles | 0 | 57.8, bound 60.2 |
+| Seconds per cycle | 87 | 160 (1.85x) |
+| Robots per operator | no operator | 4.8 |
+
+Both passed: 1 bad cycle against at most 16, and a bound of 60.2 calls against 112. 1 operator covers 4.8 robots
+(E3b 2.2), and takeovers came at 43.9 per 100 cycles. The 4 changes ran together, so E4 cannot say which one cut the
+calls. Before a call, the plain 2nd try turned 2,837 truly failed steps into accepted good ones, and the rungs 2,208
+more (1,173 regrips and 1,035 reinserts that made a bad step good and were accepted). Neither rung made a good step
+bad. The checks could not decide 4 times in 5,000 cycles, all on good insertions, and the reinsert settled each, so
+the operator was never asked to confirm. E3b had made 73.3 calls per 100 cycles after an abstain.
+
+The 1 bad cable followed a stuck release. The fingers did not open on the 1st try, and the 20 mm lift pulled the
+latched plug with the jaws closed until the latch gave, twice. The release check rejected that try. The retry opened
+the jaws while the arm was still springing up, and the plug fell 32 mm beside its port. The release check's 1st stage,
+a logistic score over the jaws, the release record, the lift's forces and the camera, accepted it before the pull. The
+camera's 64 degree slant and the opening height on record, 79.7 mm and read mid-spring, pushed the score up. Each sits
+at the top of the 216 bad claims of that kind in its calibration table, all of which it rejected, and no row of its
+tables holds the 2 together. Both bad cycles of the failed gate came the same way, after the dropped action: a stuck
+release, the camera without the plug and a steep slant, and a stage-1 accept. That makes 3 occurrences, a pattern to
+fix. E3b's 2 bad cables came another way: the pull stalled and was read as a hold. E4 had no bad release whose pull
+stalled. Scored again on their recorded evidence, the check here rejects 1 of E3b's 2 stalls and still accepts the
+other. On both the camera found neither housing nor plug and the pull did not slip, so 17 readings are absent, as on
+E4's own claims of that kind, and the check fills them with its fit medians as it does live.
+
+Where the calls came from: the release 27.5 per 100 cycles, the carry 22.7, the insertion 6.8 and the pick 0.7. Of
+the release's 1,377 calls, 518 came after it rejected a good release twice and 23 after it rejected a good retry of a
+stuck release: it rejected every good 2nd try (541 of 541). It weighs a 2nd release try heavily toward bad, since in
+its tables a 2nd try followed only a 1st that truly failed, and 480 of the 485 in its calibration table were bad. The
+790 cables with a stuck release drew 814 of the release's calls.
+
+![Calls for help per 100 cycles against cycles with a bad cable shipped, for the skills alone, E3, E3b and E4](img/frontier.png)
 
 ### The figure run (sim, `latch`, 100 new test seeds read once)
 

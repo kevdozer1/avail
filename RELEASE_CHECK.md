@@ -39,6 +39,15 @@ names no person. A case-insensitive search for both names found that same line a
   simulates anything, with `--no-setup` to skip that), and `scripts/setup_aspire.py`, which now prints its
   "Next" line only when it runs as a script.
 
+## The E4 update (2026-11-16, evening)
+
+- E4 ran on this code and passed both of its hypotheses. The README, `docs/RESULTS.md`, `docs/img/frontier.png`
+  and `docs/img/frontier.json` now report it, and the opening line of `docs/HOW_IT_WORKS.md` now says where a retry
+  and a recovery action come before a person.
+- `avail/analysis/frontier.py` is the working repo's, which draws each flywheel day's interval and lets the y axis
+  reach E4's interval. No other code changed, so the cable loop's code is the code E4 ran.
+- The rescan after these edits read 243 text files and found 0 hits.
+
 ## What was left out
 
 The private notes, the session briefs, the plan, the agent instructions, reports and drafts, archived worktrees, all
@@ -56,8 +65,7 @@ recorded from this snapshot.
   Tedrake's CoRL 2026 keynote by name only. Add a link or paper ID for each. The 43% hack rate is EmbodiedSWE's
   figure as recalled in the brief, so confirm it against the paper.
 - `Kevin` appears 54 times in code comments and config, as the person whose decisions set the experiments.
-- The README says E4 has not run and that a 1st gate on dev seeds failed. If either has a newer result by the time
-  this is pushed, update "What this does not show" and the frontier figure.
+- E4 ran on 2026-11-16, after the scan above. The README and the figure report it (see "The E4 update" above).
 
 ## The fresh clone (2026-11-16, 04:44 to 05:01)
 

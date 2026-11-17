@@ -3,7 +3,8 @@
 Left: x is calls for help per 100 cycles (the shift card's assists), with a 95% percentile-bootstrap interval over
 cycles. y is cycles with a bad cable shipped, log scale, with a Wilson 95% interval. A run with 0 such cycles is drawn at
 its one-sided 95% upper bound as a downward marker. The dashed line is the 0.5% bar. Right, small: the flywheel's calls
-per 100 cycles by day on its held-out set, when that run exists. Everything comes from ledgers and JSON files on disk.
+per 100 cycles on each day's own 200 cycles, with a 95% bootstrap interval from that day's ledgers, when that run
+exists. Everything comes from ledgers and JSON files on disk.
 
 Usage::
 
@@ -75,9 +76,13 @@ def draw(points: list[dict], flywheel: dict | None, out: Path) -> Path:
     ax.axhline(0.5, ls="--", color=BAR, lw=1.5)
     ax.text(right - 4, 0.58, "bar 0.5%", color=BAR, fontsize=9, ha="right")
     ax.set_yscale("log")
-    ax.set_ylim(0.01, 100)
+    # the axis reaches down to the lowest interval drawn (E4's Wilson interval on 1 bad cycle in 5,000 starts at 0.0035%)
+    floor = min([0.01] + [100 * p["lo"] for p in points if p["bad"] > 0 and p["lo"] > 0])
+    bottom = float(10 ** np.floor(np.log10(floor)))
+    ax.set_ylim(bottom, 100)
     ax.set_xlim(-8, right)
-    ax.set_yticks([0.01, 0.1, 0.5, 1, 10, 100], ["0.01%", "0.1%", "0.5%", "1%", "10%", "100%"])
+    ticks = [t for t in (0.001, 0.01, 0.1, 0.5, 1, 10, 100) if t >= bottom]
+    ax.set_yticks(ticks, [f"{t:g}%" for t in ticks])
     ax.set_xlabel("calls for help per 100 cycles")
     ax.set_ylabel("cycles with a bad cable shipped")
     for s in ("top", "right"):
@@ -89,11 +94,13 @@ def draw(points: list[dict], flywheel: dict | None, out: Path) -> Path:
         ys = [r["calls_per_100"] for r in d]
         lo = [r.get("calls_lo", r["calls_per_100"]) for r in d]
         hi = [r.get("calls_hi", r["calls_per_100"]) for r in d]
+        fx.errorbar(xs, ys, yerr=[[y - a for y, a in zip(ys, lo)], [b - y for y, b in zip(ys, hi)]], fmt="none",
+                    ecolor=COLORS["E4"], elinewidth=1.2, capsize=2)
         fx.fill_between(xs, lo, hi, color=COLORS["E4"], alpha=0.18, lw=0)
         fx.plot(xs, ys, "-o", color=COLORS["E4"], lw=2, ms=5)
         fx.set_xlabel("day")
-        fx.set_ylabel("calls per 100 cycles, held-out")
-        fx.set_title("flywheel (dev)", fontsize=10, color=INK, loc="left")
+        fx.set_ylabel("calls per 100 cycles, that day's 200")
+        fx.set_title("flywheel, dev seeds", fontsize=10, color=INK, loc="left")
         fx.set_ylim(0, max(hi) * 1.25 if max(hi) > 0 else 1)
     else:
         fx.text(0.5, 0.5, "flywheel: not run yet", ha="center", va="center", color=MUTED, fontsize=10,
@@ -125,6 +132,11 @@ def main(argv: list[str] | None = None) -> int:
         pts.append(point(label, Path(path), arm))
     pts = [p for p in pts if p]
     fly = json.loads(args.flywheel.read_text(encoding="utf-8")) if args.flywheel and args.flywheel.is_file() else None
+    if fly:                                            # each day's 95% interval on its own cycles, from its ledgers
+        for r in fly.get("days", []):
+            p = point("day", args.flywheel.parent / "days" / f"day{int(r['day']):02d}", "avail_simop")
+            if p:
+                r["calls_lo"], r["calls_hi"] = p["calls_lo"], p["calls_hi"]
     draw(pts, fly, args.out)
     if args.json:
         args.json.write_text(json.dumps({"points": pts, "flywheel": fly}, indent=1, default=float), encoding="utf-8",
