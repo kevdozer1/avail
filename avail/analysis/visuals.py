@@ -155,10 +155,26 @@ def fates_numbers(shift: str = "e4_final_latch", arm: str = "avail_simop") -> di
 
 
 # ----------------------------------------------------------------------------- 1. fleet
+E5_FLEET = {"E5n": ("AVAIL, E5n", (45000, 45999)), "E5s": ("AVAIL, stress", (86000, 86999))}
+
+
+def e5_fleet_panels() -> dict:
+    """1 more waffle per E5 arm that has ledgers: E5n's 1st 1,000 seeds, and E5s's 1,000 with stuck_release forced."""
+    out = {}
+    for arm, (label, (lo, hi)) in E5_FLEET.items():
+        shift, driver_arm = SHIFTS[arm]
+        ends = [e for e in _ends(shift, driver_arm) if lo <= int(e["seed"]) <= hi]
+        if ends:
+            out[label] = {"seeds": [int(e["seed"]) for e in ends], "class": [cycle_class(e) for e in ends]}
+    return out
+
+
 def draw_fleet(out: Path, numbers: dict | None = None, extra: dict | None = None) -> list[Path]:
-    """2 waffles of 1,000 squares, plus any ``extra`` waffle (label to classes), e.g. an E5 arm on its own seeds."""
+    """2 waffles of 1,000 squares on the same seeds, plus any ``extra`` waffle (label to classes): by default each E5
+    arm that has ledgers, on its own seeds."""
     plt = _style()
     numbers = dict(numbers or fleet_numbers())
+    extra = e5_fleet_panels() if extra is None else extra
     if extra:
         numbers.update(extra)
     panels = list(numbers.items())
@@ -183,7 +199,9 @@ def draw_fleet(out: Path, numbers: dict | None = None, extra: dict | None = None
                plt.Rectangle((0, 0), 1, 1, color=PALE)]
     fig.legend(handles, ["bad cable shipped", "left undone, said so", "all 5 done"], loc="lower center", ncol=3,
                frameon=False, fontsize=11, bbox_to_anchor=(0.5, 0.035), handlelength=1.0, handleheight=1.0)
-    fig.text(0.01, 0.012, f"1 square = 1 cycle of 5 cables. The same {len(panels[0][1]['class']):,} seeds per side",
+    same = f"The same {len(panels[0][1]['class']):,} E4 seeds for the left 2"
+    fig.text(0.01, 0.012, f"1 square = 1 cycle of 5 cables. " + (same + ", each E5 arm on its own seeds" if extra
+                                                                  else f"The same {len(panels[0][1]['class']):,} seeds per side"),
              ha="left", va="bottom", fontsize=9, color=MUTED)
     fig.subplots_adjust(left=0.03, right=0.97, top=0.80, bottom=0.1, wspace=0.12)
     _note(fig)
@@ -198,9 +216,19 @@ FATE_COLOR = {"retry": C[CODE], "rung": "#c96a10", "operator": C[OPERATOR], "lat
               "escaped": BAD}
 
 
-def draw_fates(out: Path, numbers: dict | None = None, title_run: str = "E4") -> list[Path]:
+def draw_fates(out: Path, numbers: dict | None = None, title_run: str = "E4", name: str = "fates") -> list[Path]:
+    """E4's failed steps, and with the default arguments 1 more figure per E5 arm that has ledgers (fates_e5n,
+    fates_e5s)."""
+    if numbers is None and title_run == "E4":
+        paths = []
+        for arm in ("E5n", "E5s"):
+            shift, driver_arm = SHIFTS[arm]
+            more = fates_numbers(shift, driver_arm)
+            if more and more.get("cycles"):
+                paths += draw_fates(out, more, arm + (", stuck_release forced" if arm == "E5s" else ""),
+                                    f"fates_{arm.lower()}")
+        return draw_fates(out, fates_numbers(), "E4", "fates") + paths
     plt = _style()
-    numbers = numbers or fates_numbers()
     total = numbers["total"]
     f = numbers["fates"]
     fig, ax = plt.subplots(figsize=(7.2, 6.4))
@@ -244,7 +272,7 @@ def draw_fates(out: Path, numbers: dict | None = None, title_run: str = "E4") ->
              "not done", ha="left", va="bottom", fontsize=9, color=MUTED)
     fig.subplots_adjust(left=0.02, right=0.98, top=0.9, bottom=0.06)
     _note(fig)
-    return _save(fig, out, "fates")
+    return _save(fig, out, name)
 
 
 # ----------------------------------------------------------------------------- 3. operator hour
@@ -411,25 +439,28 @@ def draw_frontier_hero(out: Path, pts: list[dict] | None = None) -> list[Path]:
         x, y = p["calls_per_100"], 100 * max(p["rate"], 1e-9)
         lo, hi = 100 * p["lo"], 100 * p["hi"]
         col = colors.get(p["label"], INK)
+        hollow = p["label"] == "E5s"                  # stuck_release forced on every cable: drawn apart from the chain
+        face = "white" if hollow else col
         if p["bad"] == 0:
             y = 100 * p["ucb95"]
-            ax.plot([x], [y], marker="v", ms=12, color=col, ls="none")
+            ax.plot([x], [y], marker="v", ms=12, color=col, mfc=face, ls="none")
         else:
-            ax.errorbar([x], [y], yerr=[[y - lo], [hi - y]], fmt="o", ms=10, color=col, capsize=4, lw=1.6)
+            ax.errorbar([x], [y], yerr=[[y - lo], [hi - y]], fmt="s" if hollow else "o", ms=10, color=col, mfc=face,
+                        capsize=4, lw=1.6)
         if p["calls_hi"] > p["calls_lo"]:
             ax.plot([p["calls_lo"], p["calls_hi"]], [y, y], color=col, lw=1.6)
         xy[p["label"]] = (x, y)
         dx, ha = (8, "left")
-        if p["label"] in ("E3b",):
-            dx, ha = (-8, "right")
-        ax.annotate(p["label"], (x, y), xytext=(dx, 8), textcoords="offset points", ha=ha, fontsize=14, color=col,
-                    fontweight="bold")
+        if p["label"] in ("E3b", "E5s"):           # E5s sits at the right edge: its label goes to its left
+            dx, ha = (-10, "right")
+        ax.annotate("E5s, stress" if hollow else p["label"], (x, y), xytext=(dx, 8), textcoords="offset points", ha=ha,
+                    fontsize=14, color=col, fontweight="bold")
     chain = [k for k in ("E3", "E3b", "E4", "E5n") if k in xy]
     for a, b in zip(chain, chain[1:]):
         ax.annotate("", xy=xy[b], xytext=xy[a], arrowprops={"arrowstyle": "-|>", "color": MUTED, "lw": 1.4,
                                                             "shrinkA": 9, "shrinkB": 9, "connectionstyle": "arc3,rad=0.15"})
     ax.axhline(0.5, color=BAD, ls="--", lw=1.4)
-    ax.text(1.0, 0.5, "bar 0.5%", transform=ax.get_yaxis_transform(), ha="right", va="bottom", fontsize=11, color=BAD)
+    ax.text(0.02, 0.5, "bar 0.5%", transform=ax.get_yaxis_transform(), ha="left", va="bottom", fontsize=11, color=BAD)
     ax.set_yscale("log")
     floor = min([0.01] + [100 * p["lo"] for p in pts if p["bad"] > 0 and p["lo"] > 0])
     ax.set_ylim(10 ** np.floor(np.log10(floor)), 100)
@@ -441,8 +472,10 @@ def draw_frontier_hero(out: Path, pts: list[dict] | None = None) -> list[Path]:
     for s in ("right", "top"):
         ax.spines[s].set_visible(False)
     ax.set_title("Fewer bad cables, fewer calls", fontsize=18, color=INK, loc="left", fontweight="bold", pad=12)
-    fig.text(0.01, 0.012, "95% intervals. 5,000 cycles per run, 1,000 for robot says done", ha="left", va="bottom",
-             fontsize=8.5, color=MUTED)
+    note = "95% intervals. 5,000 cycles per run, 1,000 for robot says done"
+    if "E5s" in xy:
+        note += " and for E5s, whose every cable's 1st release sticks"
+    fig.text(0.01, 0.012, note, ha="left", va="bottom", fontsize=8.5, color=MUTED)
     fig.subplots_adjust(left=0.15, right=0.97, top=0.9, bottom=0.14)
     _note(fig)
     return _save(fig, out, "frontier_hero")

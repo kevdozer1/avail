@@ -167,6 +167,36 @@ its tables a 2nd try followed only a 1st that truly failed, and 480 of the 485 i
 
 ![Calls for help per 100 cycles against cycles with a bad cable shipped, for the skills alone, E3, E3b and E4](img/frontier.png)
 
+### E5s: every cable's 1st release forced to stick (sim, `latch`, new test seeds read once)
+
+E5 runs a revision of the code here, frozen in the development repo, and that code does not ship in this snapshot. It
+keeps E4's carry check (`at_port`), rebuilds the pick (`held`) and release (`released_stable`) checks with a support
+guard that sends a claim whose readings fall outside the calibration data to a relook or the operator, and
+recalibrates the insertion check (`latched`). It was revised after its gate on 500 dev cycles failed on calls (77.8
+per 100 cycles against 65), measured on fresh dev seeds, frozen, and then authorized by Kevin knowing it was revised
+after a failed gate. Its arms, seeds and hypotheses were written down before the gate and did not change.
+
+E5s ran 1,000 cycles on seeds 86,000 to 86,999 with stuck_release forced on every cable. H5s: at most 2 bad cables
+shipped, and the one-sided 95% Clopper-Pearson upper bound on bad cables per forced stuck release at most 0.5%.
+
+| Sim, `latch`, E5s, 1,000 cycles | Result |
+|---|---|
+| Forced stuck releases | 4,996 |
+| Bad cables shipped | 2 (0.04%, bound 0.126%): passed |
+| Cycles with a bad cable | 2 of 1,000 |
+| Good 2nd release tries rejected | 137 of 139 |
+| Bad `at_port` claims accepted after the operator's marks | 12 of 82, none shipped |
+| Calls for help per 100 cycles | 547.7 |
+
+Both escapes have 1 shape. Seed 86,096 (cable 0, after a dropped carry fixed by a regrip) and seed 86,104 (cable 1,
+after an early release fixed by a reinsert): the stuck release left the plug unseated, the 1st release claim was
+rejected at stage 1, and the 2nd try was accepted at stage 2, the pull, with scores 3.05 and 1.45. On both pulls the
+plug slipped about 1 mm and the pull stopped on travel, and the reseat did not click. The stress arm's calls and its
+524.7 s per cycle come from the forced sticks, so they say nothing about a natural run. E5n, 5,000 natural cycles on
+45,000 to 49,999 against E4's bar and a cap of 65 calls per 100 cycles, is running.
+
+![What came of every failed step under forced stuck releases](img/visuals/fates_e5s.png)
+
 ### The figure run (sim, `latch`, 100 new test seeds read once)
 
 ![The figure](img/fig.png)
