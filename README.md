@@ -33,7 +33,7 @@ instead of abstaining, and recovery actions after the carry's and the insertion'
 of a cable that hangs crooked over its port, a reinsert of the plug). On new seeds it met the same bar with 1 bad
 cycle in 5,000, at 57.8 calls for help per 100 cycles and 1.85 times the skills' cycle time, so 1 operator covers 4.8
 robots against E3b's 2.2. The 4 changes ran together. The 3 runs are not 3 tests of 1 system, and E3's failure stays
-on record. [RESULTS.md](docs/RESULTS.md) has every table.
+on record. [RESULTS.md](docs/RESULTS.md) has every table, and [VISUALS.md](docs/VISUALS.md) shows E4 in 6 pictures.
 
 ## Run the demo: 1 command
 
