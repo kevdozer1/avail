@@ -103,3 +103,9 @@ On 2026-11-13 the same check from a copied folder passed: setup 10.6 s, 3,067 te
 E5s added to `README.md`, `docs/RESULTS.md` and `docs/VISUALS.md`, with the pictures redrawn and 3 stills from the
 side-by-side video. `avail/analysis/visuals.py` gained the E5 panels. E5's own code does not ship here. The rescan
 after these edits read 253 text files and found 0 hits.
+
+## The E5n update (2026-11-17)
+
+E5n added to `README.md`, `docs/RESULTS.md` and `docs/VISUALS.md`, with the pictures redrawn, its fates figure and 3
+stills from the 2nd side-by-side video. E5's own code does not ship here.
+The rescan after these edits read 254 text files and found 0 hits.

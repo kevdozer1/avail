@@ -33,15 +33,16 @@ instead of abstaining, and recovery actions after the carry's and the insertion'
 of a cable that hangs crooked over its port, a reinsert of the plug). On new seeds it met the same bar with 1 bad
 cycle in 5,000, at 57.8 calls for help per 100 cycles and 1.85 times the skills' cycle time, so 1 operator covers 4.8
 robots against E3b's 2.2. The 4 changes ran together. The 3 runs are not 3 tests of 1 system, and E3's failure stays
-on record. [RESULTS.md](docs/RESULTS.md) has every table, and [VISUALS.md](docs/VISUALS.md) shows the runs in 7
-pictures and 3 stills from a side-by-side video.
+on record. [RESULTS.md](docs/RESULTS.md) has every table, and [VISUALS.md](docs/VISUALS.md) shows the runs in 8
+pictures and 6 stills from 2 side-by-side videos.
 
 E5 tests a revision of the code here on new test seeds, and its code does not ship in this snapshot. It keeps E4's
 carry check, rebuilds the pick and release checks with a guard that sends a claim whose readings fall outside the
 calibration data to a relook or a person, and recalibrates the insertion check. It was revised after its own gate
 failed on calls, and Kevin authorized it knowing that. Its stress arm, E5s, forced the 1st release of
 every cable to stick in 1,000 cycles: 2 bad cables shipped in 4,996 forced stuck releases, bound 0.126% against a
-0.5% bar, so it passed. Its natural arm, E5n, 5,000 cycles against the same bar as E4, is running.
+0.5% bar, so it passed. Its natural arm, E5n, passed both of its hypotheses: 2 of 5,000 cycles shipped a bad
+cable (bound 0.126% against 0.5%), and it made 51.1 calls for help per 100 cycles (bound 53.4 against 65).
 
 ## Run the demo: 1 command
 
@@ -125,9 +126,10 @@ per 100 cycles.
 - Calls are counted, and a takeover costs far more than a confirm. 541 of E4's 2,892 calls came after the release
   check rejected a good 2nd try. It weighs a 2nd release try heavily toward bad, because in its tables a 2nd try
   followed only a 1st that truly failed.
-- E5s's 2 escapes passed the rebuilt release check's 2nd stage, the pull. In both the stuck release left the plug
-  unseated, the 1st release claim was rejected, and the 2nd try was accepted although the pull slipped about 1 mm and
-  the reseat did not click. 2 occurrences, below this project's 3 for a rule.
+- 3 of E5's 4 escapes passed the rebuilt release check's 2nd stage, the pull, with a score between its 2
+  thresholds, which cross, so the stage accepts there. In each the pull slipped about 1 mm and the reseat did not
+  click. 3 occurrences is this project's count for a rule, and the fix is not yet built. The 4th escape, in E5n, was
+  accepted at stage 1 just over its threshold, with nothing in its readings that looks like a failed release.
 - ASPIRE's real server was not run. The proxy was tested against a mock built from ASPIRE's own tool definitions.
 - The closed-loop judge is a cheap model. A stronger judge may pass fewer bad plugs and was not run in closed loop.
 - The bounds hold for states like these: this station and this mix of failures.

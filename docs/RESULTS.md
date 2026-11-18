@@ -192,10 +192,36 @@ Both escapes have 1 shape. Seed 86,096 (cable 0, after a dropped carry fixed by 
 after an early release fixed by a reinsert): the stuck release left the plug unseated, the 1st release claim was
 rejected at stage 1, and the 2nd try was accepted at stage 2, the pull, with scores 3.05 and 1.45. On both pulls the
 plug slipped about 1 mm and the pull stopped on travel, and the reseat did not click. The stress arm's calls and its
-524.7 s per cycle come from the forced sticks, so they say nothing about a natural run. E5n, 5,000 natural cycles on
-45,000 to 49,999 against E4's bar and a cap of 65 calls per 100 cycles, is running.
+524.7 s per cycle come from the forced sticks, so they say nothing about a natural run.
 
 ![What came of every failed step under forced stuck releases](img/visuals/fates_e5s.png)
+
+### E5n: natural cycles (sim, `latch`, new test seeds read once)
+
+E5n ran 5,000 cycles on seeds 45,000 to 49,999 from the same frozen code. H5a: the one-sided 95% Clopper-Pearson
+upper bound on cycles with a bad cable at most 0.5%. H5b: a one-sided 95% bootstrap upper bound on calls for help per
+100 cycles at most 65.
+
+| Sim, `latch`, E5n, 5,000 cycles | E5n | E4 |
+|---|---|---|
+| Cycles with a bad cable | 2 (0.04%, bound 0.126%): passed | 1 (0.02%, bound 0.095%) |
+| Calls for help per 100 cycles | 51.1 (bound 53.4 against 65): passed | 57.8 (bound 60.2) |
+| Seconds per cycle | 155.9 | 160.0 |
+| Robots per operator | 5.4 | 4.8 |
+| Takeovers per 100 cycles | 36.0 | 43.9 |
+| Good 2nd release tries rejected | 154 of 154 | 541 of 541 |
+| Bad `at_port` claims accepted after the operator's marks | 82 of 413, none shipped | 20.7% |
+
+Escape 1, seed 45,432, cable 0: after an early release and a good 2nd insertion, the release check accepted a false
+release claim at stage 1 with 6.37 against a threshold of 6.19. Its readings look like a clean release: jaws open,
+no closed lift, and the camera read the plug seated. It is 1 of 190 stage-1 release accepts in E5n. Escape 2, seed
+45,577, cable 4: the pull accepted a false release claim at 1.63, between its crossed thresholds (1.10 and 5.42).
+The plug slipped 1 mm, the pull stopped on travel and the reseat did not click, the shape of both E5s escapes. The
+pull accepted 369 claims between those thresholds in E5n, and 368 were good. With the crossing rule `abstain` it
+would have accepted none of them and sent the good ones to the operator, up to 7.4 more calls per 100 cycles, an
+estimate that was not run.
+
+![What came of every failed step in E5n](img/visuals/fates_e5n.png)
 
 ### The figure run (sim, `latch`, 100 new test seeds read once)
 
